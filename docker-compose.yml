@@ -1,0 +1,59 @@
+services:
+  # Backend API (FastAPI on port 8000)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: community-spaces-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - BACKEND_HOST=0.0.0.0
+      - BACKEND_PORT=8000
+      - FRONTEND_URL=http://localhost:3000
+      - DATABASE_PATH=/app/app.db
+      - SECRET_KEY=dev-secret-key-change-in-production
+    volumes:
+      - ./backend:/app
+      - community-spaces-db:/app
+    command: python main.py
+    networks:
+      - community-spaces-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Frontend (Next.js on port 3000)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: community-spaces-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    command: npm run dev
+    networks:
+      - community-spaces-network
+    depends_on:
+      - backend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  community-spaces-network:
+    driver: bridge
+
+volumes:
+  community-spaces-db:
+    driver: local
