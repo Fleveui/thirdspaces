@@ -1,0 +1,11 @@
+# Community Space Sharing Platform - Dev/Tooling Dependencies
+# Install with: pip install -r requirements-dev.txt
+#
+# These are NOT needed to run the API server. They are only used by the
+# one-off Excel data import (import_excel.py). Kept out of the runtime
+# requirements so the production image doesn't pull ~50MB of pandas.
+
+-r requirements.txt
+
+pandas>=2.1.0,<3.0.0
+openpyxl>=3.1.0,<4.0.0
