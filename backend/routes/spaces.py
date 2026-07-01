@@ -10,7 +10,7 @@ from typing import List, Optional
 from models import Space, User
 from database import get_db
 from dependencies import require_space_owner
-from services.spaces import create_space
+from services.spaces import create_space, list_spaces_by_owner
 
 router = APIRouter(prefix="/api/spaces", tags=["spaces"])
 
@@ -46,6 +46,16 @@ class SpaceResponse(BaseModel):
     class Config:
         from_attributes = True
 
+
+class SpaceListingSummary(BaseModel):
+    """Minimal space info for owner dashboard listings"""
+    id: str
+    name: str
+    location: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
 # Endpoints
 
 @router.post("", response_model=SpaceResponse, status_code=status.HTTP_201_CREATED)
@@ -68,6 +78,22 @@ def create_space_endpoint(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=error)
 
     return space
+
+
+@router.get("/mine", response_model=List[SpaceListingSummary])
+def list_my_spaces(
+    user: User = Depends(require_space_owner),
+    db: Session = Depends(get_db),
+):
+    """
+    Get spaces listed by the authenticated space owner.
+
+    Requires: space_owner account with valid JWT token.
+
+    Returns:
+        List of the owner's spaces (id, name, location only).
+    """
+    return list_spaces_by_owner(owner_id=user.id, db=db)
 
 
 @router.get("", response_model=List[SpaceResponse])

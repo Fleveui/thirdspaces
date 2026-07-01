@@ -21,22 +21,16 @@ import Link from 'next/link'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
 import { useState, useEffect } from 'react'
 
-interface Space {
+interface SpaceListing {
   id: string
   name: string
-  owner_id: string
-  area_m2: number
-  is_outdoor: boolean
-  category: string
-  availability: string
-  deposit_needed: number
-  location: string
+  location: string | null
 }
 
 function DashboardContent() {
   const { user, logout } = useAuth()
   const router = useRouter()
-  const [spaces, setSpaces] = useState<Space[]>([])
+  const [listings, setListings] = useState<SpaceListing[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -45,17 +39,27 @@ function DashboardContent() {
     router.push('/login')
   }
 
-  // Fetch spaces from API
+  const isSpaceOwner = user?.account_type === 'space_owner'
+
   useEffect(() => {
-    const fetchSpaces = async () => {
+    if (!isSpaceOwner) {
+      setLoading(false)
+      return
+    }
+
+    const fetchListings = async () => {
       try {
         const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-        const response = await fetch(`${apiUrl}/api/spaces`)
+        const token = localStorage.getItem('auth_token')
+        const response = await fetch(`${apiUrl}/api/spaces/mine`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
         if (!response.ok) {
-          throw new Error('Failed to fetch spaces')
+          const data = await response.json().catch(() => ({}))
+          throw new Error(data.detail || 'Failed to fetch your listings')
         }
         const data = await response.json()
-        setSpaces(data)
+        setListings(data)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error')
       } finally {
@@ -63,10 +67,8 @@ function DashboardContent() {
       }
     }
 
-    fetchSpaces()
-  }, [])
-
-  const isSpaceOwner = user?.account_type === 'space_owner'
+    fetchListings()
+  }, [isSpaceOwner])
 
   return (
     <div className="min-h-screen bg-light">
@@ -121,10 +123,29 @@ function DashboardContent() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {isSpaceOwner ? (
             <>
-              {/* Space Owner Dashboard Sections */}
-              <div className="card opacity-50">
-                <h3 className="font-semibold text-dark mb-2">Your Spaces</h3>
-                <p className="text-gray-600 text-sm">Coming soon: manage your listed spaces</p>
+              <div className="card md:col-span-2">
+                <h3 className="font-semibold text-dark mb-4">Your Listings</h3>
+                {loading ? (
+                  <p className="text-gray-600 text-sm">Loading your listings...</p>
+                ) : error ? (
+                  <p className="text-red-600 text-sm">{error}</p>
+                ) : listings.length === 0 ? (
+                  <p className="text-gray-600 text-sm">
+                    You have not listed any spaces yet.{' '}
+                    <Link href="/spaces/new" className="text-primary hover:underline">
+                      List a Space
+                    </Link>
+                  </p>
+                ) : (
+                  <ul className="divide-y divide-gray-200">
+                    {listings.map((listing) => (
+                      <li key={listing.id} className="py-3 first:pt-0 last:pb-0">
+                        <p className="font-medium text-dark">{listing.name}</p>
+                        <p className="text-sm text-gray-600">{listing.location || 'No location set'}</p>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
               <div className="card opacity-50">
                 <h3 className="font-semibold text-dark mb-2">Booking Requests</h3>

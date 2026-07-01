@@ -47,6 +47,7 @@ app.include_router(auth_router)
 
 # Include spaces routes
 # GET /api/spaces - list all spaces
+# GET /api/spaces/mine - list current owner's spaces
 # GET /api/spaces/{id} - get space details
 app.include_router(spaces_router)
 

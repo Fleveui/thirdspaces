@@ -1,7 +1,7 @@
 # Spaces Business Logic Service
 # Handles space creation and validation
 
-from typing import Optional, Tuple
+from typing import List, Optional, Tuple
 import uuid
 from sqlalchemy.orm import Session
 from models import Space
@@ -61,3 +61,13 @@ def create_space(
     except Exception as e:
         db.rollback()
         return None, f"Database error: {str(e)}"
+
+
+def list_spaces_by_owner(owner_id: str, db: Session) -> List[Space]:
+    """Return all spaces owned by the given user."""
+    return (
+        db.query(Space)
+        .filter(Space.owner_id == owner_id)
+        .order_by(Space.created_at.desc())
+        .all()
+    )

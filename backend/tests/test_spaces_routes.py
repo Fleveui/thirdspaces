@@ -1,6 +1,6 @@
 """API tests for spaces routes."""
 
-from tests.conftest import auth_headers, register_user
+from tests.conftest import auth_headers, login_user, register_user
 
 
 def valid_space_payload(**overrides):
@@ -40,6 +40,67 @@ class TestListSpaces:
         assert response.status_code == 200
         assert len(spaces) == 1
         assert spaces[0]["name"] == "New Loft"
+
+
+class TestListMySpaces:
+    def test_list_my_spaces_empty(self, client, space_owner_token):
+        response = client.get(
+            "/api/spaces/mine",
+            headers=auth_headers(space_owner_token),
+        )
+
+        assert response.status_code == 200
+        assert response.json() == []
+
+    def test_list_my_spaces_returns_only_owner_spaces(self, client, space_owner_token):
+        register_user(
+            client,
+            username="owner2",
+            email="owner2@example.com",
+            password="secret12",
+            account_type="space_owner",
+        )
+        other_owner_login = login_user(client, "owner2", "secret12")
+        other_owner_token = other_owner_login.json()["token"]
+
+        client.post(
+            "/api/spaces",
+            json=valid_space_payload(name="Owner Loft", location="Milan"),
+            headers=auth_headers(space_owner_token),
+        )
+        client.post(
+            "/api/spaces",
+            json=valid_space_payload(name="Other Loft", location="Rome"),
+            headers=auth_headers(other_owner_token),
+        )
+
+        response = client.get(
+            "/api/spaces/mine",
+            headers=auth_headers(space_owner_token),
+        )
+
+        assert response.status_code == 200
+        listings = response.json()
+        assert len(listings) == 1
+        assert listings[0]["name"] == "Owner Loft"
+        assert listings[0]["location"] == "Milan"
+        assert "owner_id" not in listings[0]
+        assert "area_m2" not in listings[0]
+
+    def test_list_my_spaces_without_auth_returns_401(self, client):
+        response = client.get("/api/spaces/mine")
+
+        assert response.status_code == 401
+
+    def test_list_my_spaces_as_regular_user_returns_403(
+        self, client, regular_user_token
+    ):
+        response = client.get(
+            "/api/spaces/mine",
+            headers=auth_headers(regular_user_token),
+        )
+
+        assert response.status_code == 403
 
 
 class TestGetSpace:
