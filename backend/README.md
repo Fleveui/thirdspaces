@@ -57,6 +57,63 @@ Expected response: `{"status":"healthy"}`
 
 Stop the server with `Ctrl+C`.
 
+## Tests
+
+The backend uses [pytest](https://docs.pytest.org/) for unit and API tests. Test files live in `tests/`.
+
+### Prerequisites
+
+From the `backend` directory, with your virtual environment activated and dependencies installed (see steps 2–3 above):
+
+```bash
+cd backend
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+### Run all tests
+
+```bash
+pytest
+```
+
+Verbose output (shows each test name):
+
+```bash
+pytest -v
+```
+
+### Run a subset
+
+Single file:
+
+```bash
+pytest tests/test_auth_service.py
+```
+
+Single test class or method:
+
+```bash
+pytest tests/test_spaces_routes.py::TestCreateSpace
+pytest tests/test_spaces_routes.py::TestCreateSpace::test_create_space_as_owner
+```
+
+### What gets tested
+
+| File | Coverage |
+|------|----------|
+| `test_auth_service.py` | Password hashing, JWT tokens, register/authenticate logic |
+| `test_auth_routes.py` | `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/me` |
+| `test_spaces_service.py` | `create_space` validation and persistence |
+| `test_spaces_routes.py` | `GET/POST /api/spaces`, auth (401/403), owner linking |
+| `test_health.py` | `/` and `/health` |
+
+### Notes
+
+- Tests use an **in-memory SQLite database** — they do not read or write `app.db`.
+- No running server is required; tests use FastAPI's `TestClient`.
+- `pytest.ini` in this directory configures test discovery and the Python path.
+
 ## Notes
 
 - **Auto-reload:** `main.py` runs uvicorn with `reload=True`, so code changes restart the server automatically.
