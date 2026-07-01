@@ -4,32 +4,71 @@
 # Called by: frontend (see frontend/src/app/dashboard)
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
-from typing import List
-from models import Space
+from typing import List, Optional
+from models import Space, User
 from database import get_db
+from dependencies import require_space_owner
+from services.spaces import create_space
 
 router = APIRouter(prefix="/api/spaces", tags=["spaces"])
 
 # Request/Response Models (Pydantic schemas)
+
+class CreateSpaceRequest(BaseModel):
+    """Incoming request to create a new space listing"""
+    name: str = Field(..., min_length=1)
+    location: str = Field(..., min_length=1)
+    area_m2: float = Field(..., gt=0)
+    category: str = Field(..., min_length=1)
+    is_outdoor: Optional[bool] = None
+    availability: Optional[str] = None
+    description: Optional[str] = None
+    rules: Optional[str] = None
+    deposit_needed: Optional[float] = None
+
 
 class SpaceResponse(BaseModel):
     """Space information for API responses"""
     id: str
     name: str
     owner_id: str
-    area_m2: float
-    is_outdoor: bool
-    category: str
-    availability: str
-    deposit_needed: float
-    location: str
-    
+    area_m2: Optional[float] = None
+    is_outdoor: Optional[bool] = None
+    category: Optional[str] = None
+    availability: Optional[str] = None
+    deposit_needed: Optional[float] = None
+    location: Optional[str] = None
+    description: Optional[str] = None
+    rules: Optional[str] = None
+
     class Config:
         from_attributes = True
 
 # Endpoints
+
+@router.post("", response_model=SpaceResponse, status_code=status.HTTP_201_CREATED)
+def create_space_endpoint(
+    request: CreateSpaceRequest,
+    user: User = Depends(require_space_owner),
+    db: Session = Depends(get_db),
+):
+    """
+    Create a new space listing.
+
+    Requires: space_owner account with valid JWT token.
+
+    Returns:
+        201 with the created space on success; 400 on validation error.
+    """
+    space, error = create_space(owner_id=user.id, data=request, db=db)
+
+    if error:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=error)
+
+    return space
+
 
 @router.get("", response_model=List[SpaceResponse])
 def list_spaces(db: Session = Depends(get_db)):

@@ -57,6 +57,8 @@ class Space(Base):
     availability = Column(String(100), nullable=True)
     deposit_needed = Column(Float, nullable=True)
     location = Column(String(255), nullable=True)
+    description = Column(Text, nullable=True)
+    rules = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     
     def __repr__(self):

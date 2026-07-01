@@ -3,19 +3,17 @@
 # HTTP endpoints for login, registration, and session management
 # Called by: frontend (see frontend/src/app/login and frontend/src/app/register)
 
-from fastapi import APIRouter, Depends, HTTPException, status, Header
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.orm import Session
-from typing import Optional
 from services.auth import (
-    register_user, 
-    authenticate_user, 
+    register_user,
+    authenticate_user,
     create_access_token,
-    verify_token,
-    get_user_by_id
 )
 from models import User
 from database import get_db
+from dependencies import get_current_user
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -57,47 +55,6 @@ class UserResponse(BaseModel):
 class ErrorResponse(BaseModel):
     """Error response"""
     error: str
-
-# Dependency: extract and verify JWT token from request header
-def get_current_user(authorization: Optional[str] = Header(None), db: Session = Depends(get_db)) -> User:
-    """
-    Verify JWT token and return the authenticated user
-    Used by protected endpoints to ensure user is logged in
-    
-    Token is extracted from Authorization header: "Bearer <token>"
-    """
-    if not authorization:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing authentication token"
-        )
-    
-    # Extract token from "Bearer <token>" format
-    try:
-        scheme, token = authorization.split()
-        if scheme.lower() != "bearer":
-            raise ValueError
-    except ValueError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authorization header format"
-        )
-    
-    user_id = verify_token(token)
-    if not user_id:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token"
-        )
-    
-    user = get_user_by_id(user_id, db)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found"
-        )
-    
-    return user
 
 # Routes
 

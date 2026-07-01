@@ -17,6 +17,7 @@
 
 import { useAuth } from '@/lib/auth'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
 import { useState, useEffect } from 'react'
 
@@ -80,12 +81,16 @@ function DashboardContent() {
               {isSpaceOwner ? 'Manage your spaces and booking requests' : 'Discover and book spaces'}
             </p>
           </div>
-          <button
-            onClick={handleLogout}
-            className="btn-secondary"
-          >
-            Log Out
-          </button>
+          <div className="flex gap-3">
+            {isSpaceOwner && (
+              <Link href="/spaces/new" className="btn-primary">
+                List a Space
+              </Link>
+            )}
+            <button onClick={handleLogout} className="btn-secondary">
+              Log Out
+            </button>
+          </div>
         </div>
       </header>
 
