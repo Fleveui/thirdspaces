@@ -140,8 +140,13 @@ function DashboardContent() {
                   <ul className="divide-y divide-gray-200">
                     {listings.map((listing) => (
                       <li key={listing.id} className="py-3 first:pt-0 last:pb-0">
-                        <p className="font-medium text-dark">{listing.name}</p>
-                        <p className="text-sm text-gray-600">{listing.location || 'No location set'}</p>
+                        <Link
+                          href={`/spaces/${listing.id}`}
+                          className="block hover:bg-gray-50 -mx-2 px-2 rounded transition-colors"
+                        >
+                          <p className="font-medium text-dark">{listing.name}</p>
+                          <p className="text-sm text-gray-600">{listing.location || 'No location set'}</p>
+                        </Link>
                       </li>
                     ))}
                   </ul>
