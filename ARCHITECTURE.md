@@ -15,6 +15,10 @@
 │  │  Login Page  │  │ Register Pg  │  │ Dashboard    │        │
 │  │  /login      │  │ /register    │  │ /dashboard   │        │
 │  └──────────────┘  └──────────────┘  └──────────────┘        │
+│  ┌──────────────┐                                            │
+│  │ List Space   │  (space_owner only)                         │
+│  │ /spaces/new  │                                            │
+│  └──────────────┘                                            │
 │         │                 │                   │               │
 │         └─────────────────┴───────────────────┘               │
 │                       │                                       │
@@ -35,6 +39,8 @@
                        │ POST /api/auth/login
                        │ POST /api/auth/register
                        │ GET /api/auth/me
+                       │ POST /api/spaces
+                       │ GET /api/spaces/mine
                        ▼
 ┌──────────────────────────────────────────────────────────────┐
 │        Backend (FastAPI)  http://localhost:8000               │
@@ -43,7 +49,7 @@
 │  │  main.py (entry point)                                 │  │
 │  │  - starts FastAPI server                               │  │
 │  │  - enables CORS for frontend                           │  │
-│  │  - includes auth routes                                │  │
+│  │  - includes auth and spaces routes                     │  │
 │  └────────────────────────────────────────────────────────┘  │
 │                       │                                       │
 │  ┌────────────────────▼────────────────────────────────────┐  │
@@ -55,6 +61,20 @@
 │  └────────────────────┬───────────────────────────────────┘  │
 │                       │                                       │
 │  ┌────────────────────▼────────────────────────────────────┐  │
+│  │  routes/spaces.py (HTTP endpoints)                     │  │
+│  │  - POST /api/spaces (create listing, owner only)       │  │
+│  │  - GET /api/spaces/mine (owner's listings, owner only) │  │
+│  │  - GET /api/spaces (public list)                       │  │
+│  │  - GET /api/spaces/{id} (public detail)                │  │
+│  └────────────────────┬───────────────────────────────────┘  │
+│                       │                                       │
+│  ┌────────────────────▼────────────────────────────────────┐  │
+│  │  dependencies.py (shared auth)                         │  │
+│  │  - get_current_user() [JWT from Authorization header]  │  │
+│  │  - require_space_owner() [403 if not space_owner]      │  │
+│  └────────────────────┬───────────────────────────────────┘  │
+│                       │                                       │
+│  ┌────────────────────▼────────────────────────────────────┐  │
 │  │  services/auth.py (business logic)                      │  │
 │  │  - hash_password() [bcrypt]                             │  │
 │  │  - verify_password()                                    │  │
@@ -62,6 +82,12 @@
 │  │  - verify_token()                                       │  │
 │  │  - register_user()                                      │  │
 │  │  - authenticate_user()                                  │  │
+│  └────────────────────┬───────────────────────────────────┘  │
+│                       │                                       │
+│  ┌────────────────────▼────────────────────────────────────┐  │
+│  │  services/spaces.py (business logic)                   │  │
+│  │  - create_space()                                       │  │
+│  │  - list_spaces_by_owner()                               │  │
 │  └────────────────────┬───────────────────────────────────┘  │
 │                       │                                       │
 │  ┌────────────────────▼────────────────────────────────────┐  │
@@ -89,13 +115,16 @@
 │              app.db (local file)                              │
 │                                                               │
 │  tables:                                                      │
+│  - users (authentication)                                    │
+│      • id, username, email, password_hash, account_type      │
 │  - personal_account (borrowers)                              │
 │      • id, name, surname, email, password_hash               │
 │  - business_account (space owners)                           │
 │      • id, name, surname, company, company_email             │
 │  - space (available spaces)                                  │
 │      • id, name, owner_id, area_m2, is_outdoor,             │
-│      • category, availability, deposit_needed, location      │
+│      • category, availability, deposit_needed, location,     │
+│      • description, rules                                    │
 │  - booking (reservation requests)                            │
 │      • booking_id, space_id, borrower_id, start_date,       │
 │      • end_date, status, created_at                          │
@@ -103,6 +132,7 @@
 │      • photo_id, space_id, image_url, position               │
 │                                                               │
 │  Relationships:                                              │
+│  users (space_owner) → space.owner_id                        │
 │  personal_account → booking → space ← business_account       │
 │                          ↑            ↓                      │
 │                          └── space_photo                      │
@@ -114,7 +144,7 @@
 | Component | Type | Runs How | Port | Purpose |
 |-----------|------|----------|------|---------|
 | Frontend | local/docker | Node.js in container | 3000 | Web UI (login, dashboard) |
-| Backend | local/docker | Python in container | 8000 | API server (auth endpoints) |
+| Backend | local/docker | Python in container | 8000 | API server (auth + spaces endpoints) |
 | Database | local/docker | SQLite in container | - | User data and credentials |
 
 ## Tech Stack Decisions
@@ -333,6 +363,58 @@
 7. Dashboard renders with user information
 ```
 
+## Data Flow: Create Space Listing (Space Owner)
+
+```
+1. Space owner clicks "List a Space" on dashboard
+   ↓
+2. Navigates to /spaces/new (ProtectedRoute + account_type check)
+   ↓
+3. Owner fills form:
+   name, location, area_m2, category, is_outdoor,
+   availability, description, rules, deposit_needed
+   ↓
+4. Frontend validation (required fields, area > 0)
+   ↓
+5. POST /api/spaces
+   Headers: Authorization: Bearer <token>
+   Body: CreateSpaceRequest JSON
+   ↓
+6. Backend: require_space_owner dependency
+   - No/invalid token → 401
+   - account_type != space_owner → 403
+   ↓
+7. services/spaces.py → create_space(owner_id=user.id, ...)
+   - Validates name, location, area_m2, category
+   - Sets owner_id from authenticated users.id (not business_account)
+   ↓
+8. INSERT into spaces table (includes description, rules)
+   ↓
+9. Return 201 + SpaceResponse
+   ↓
+10. Frontend redirects to /dashboard
+```
+
+## Data Flow: Owner Dashboard Listings
+
+```
+1. Space owner loads /dashboard
+   ↓
+2. useEffect detects account_type === 'space_owner'
+   ↓
+3. GET /api/spaces/mine
+   Headers: Authorization: Bearer <token>
+   ↓
+4. Backend: require_space_owner → list_spaces_by_owner(user.id)
+   ↓
+5. Return list of SpaceListingSummary:
+   { id, name, location } only
+   ↓
+6. Dashboard renders "Your Listings" section
+   - Each row: space name + location
+   - Empty state links to /spaces/new
+```
+
 ## External Dependencies
 
 **None at this phase.** All services run locally:
@@ -351,6 +433,8 @@
 | Token invalid | Tampered or corrupt | Reject and redirect to /login |
 | Backend unreachable | Service down | Show "Network error. Try again" |
 | Invalid form input | Client-side validation | Show field-level error message |
+| Not space owner | Wrong account type on protected endpoint | 403 or redirect to dashboard |
+| Space validation failed | Missing/invalid listing fields | 400 with detail message |
 
 ## Environment Configuration
 
@@ -404,13 +488,16 @@ personal_account          business_account
 space
 ├─ id (PK)
 ├─ name
-├─ owner_id (FK) ────→ business_account.id
+├─ owner_id (FK) ────→ users.id (for app-created listings)
+│                      business_account.id (for Excel/seed import)
 ├─ area_m2
 ├─ is_outdoor
 ├─ category
 ├─ availability
 ├─ deposit_needed
 ├─ location
+├─ description
+├─ rules
 └─ created_at
 
 booking
@@ -485,19 +572,31 @@ Community Space Sharing Platform - Excel Import
 - During development: when Excel data changes
 - Not needed during production (users create accounts via web UI)
 
-→ see DECISIONS.md #12 and #13 for the "why" behind this approach
+→ see DECISIONS.md #12, #13, #14, and #15 for the "why" behind this approach
+
+## Current Phase: Space Listings (Partial)
+
+**Implemented:**
+- Space owners can create listings via `POST /api/spaces` and `/spaces/new`
+- Space model includes `description` and `rules` (app-requirements §3)
+- Owner dashboard shows their listings (name + location) via `GET /api/spaces/mine`
+- Public `GET /api/spaces` and `GET /api/spaces/{id}` for discovery (detail page not built yet)
+- Demo seed data (`seed_data.py`) in English with description/rules populated
+
+**Not yet implemented:**
+- Photo upload / `space_photo` creation from the UI
+- Availability calendar widget (text field only for now)
+- Space detail page and Book Now flow
+- Filtering dashboard bookings, messages, calendar
 
 ## Next Phases
 
-### Phase 2: Space Discovery
-- Add Space model (name, owner, location, images, availability)
-- Add /api/space endpoints (list, search, filter, detail)
-- Add space listing pages
-- Add dashboard sections showing bookings
+### Phase 2: Space Discovery (remaining)
+- Space search/filter UI and proximity ordering
+- Space detail page with photo gallery
+- User dashboard sections (bookings, saved spaces)
 
 ### Phase 3: Booking & Chat
-- Add Booking model
-- Add /api/booking endpoints
 - Add booking form and calendar
 - Add real-time chat (WebSocket or polling)
 

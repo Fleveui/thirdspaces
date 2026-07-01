@@ -104,15 +104,17 @@
 **What was unclear:** The initial schema only included a `users` table. The specification mentions spaces, bookings, photos, and two account types. The database design needed to match the Excel file structure.
 
 **What we decided:**
-- Replace single `users` table with separate `personal_account` and `business_account` tables
+- Keep `users` table for JWT authentication (login/register) alongside Excel-derived account tables
 - Add `spaces`, `booking`, and `space_photo` tables matching the Excel sheets
+- Extend `spaces` with `description` and `rules` (Text, nullable) for listing form — required by app-requirements §3
 - Create `import_excel.py` script to populate SQLite from the Excel file
+- Create `seed_data.py` for English demo data including description/rules
 - Passwords are not imported from Excel; they must be set via registration flow for security
 
 **Tables created:**
 - `personal_account` (ID, NAME, SURNAME, E-MAIL, password_hash)
 - `business_account` (ID, NAME, SURNAME, COMPANY, COMPANY_EMAIL, password_hash)
-- `space` (ID, NAME, OWNER_ID, AREA_M2, IS_OUTDOOR, CATEGORY, AVAILABILITY, DEPOSIT_NEEDED, LOCATION)
+- `space` (ID, NAME, OWNER_ID, AREA_M2, IS_OUTDOOR, CATEGORY, AVAILABILITY, DEPOSIT_NEEDED, LOCATION, DESCRIPTION, RULES)
 - `booking` (BOOKING_ID, SPACE_ID, BORROWER_ID, START_DATE, END_DATE, STATUS)
 - `space_photo` (PHOTO_ID, SPACE_ID, IMAGE_URL, POSITION)
 
@@ -128,6 +130,42 @@
 - Manual CSV exports → less maintainable, error-prone
 
 **Can it change?** Yes — add more fields or tables as the specification evolves. Update import_excel.py to handle new sheets.
+
+---
+
+## 14. Space Listing Creation
+**What was unclear:** How space owners add new listings, which fields are required, and how ownership is recorded.
+
+**What we decided:**
+- **List a Space** button on the owner dashboard header → form at `/spaces/new`
+- `POST /api/spaces` with `CreateSpaceRequest` (name, location, area_m2, category, plus optional is_outdoor, availability, description, rules, deposit_needed)
+- `owner_id` set from authenticated `users.id` (JWT), not `business_account.id`
+- Shared auth in `dependencies.py`: `get_current_user()` + `require_space_owner()` (403 for non-owners)
+- Business logic in `services/spaces.py` → `create_space()`
+- Photos deferred — no image upload in this phase
+- Availability stored as free text until calendar UI exists
+
+**Required fields:** name, location, area_m2 (> 0), category
+
+**Why:** Matches app-requirements §3 (Space Details); reuses existing JWT auth; keeps create flow separate from Excel/seed import data.
+
+**Can it change?** Yes — photo upload, calendar widget, and edit/delete endpoints can be added later.
+
+---
+
+## 15. Owner Listings on Dashboard
+**What was unclear:** How owners see only their own spaces on the dashboard without exposing other owners' data.
+
+**What we decided:**
+- `GET /api/spaces/mine` — authenticated `space_owner` only
+- Returns minimal `SpaceListingSummary`: `id`, `name`, `location` (no full SpaceResponse)
+- `list_spaces_by_owner()` filters `spaces.owner_id == user.id`, ordered by `created_at` desc
+- Route registered as `/mine` before `/{space_id}` to avoid path collision
+- Frontend dashboard fetches on load for space owners only; shows empty state with link to `/spaces/new`
+
+**Why:** Owner dashboard (app-requirements §8) needs "their spaces" without loading the public catalog; summary shape matches current UI (name + location only).
+
+**Can it change?** Yes — can extend summary with thumbnail, status, or link to edit when detail/management pages exist.
 
 ---
 
@@ -169,14 +207,19 @@ Shows import progress for each sheet and count of records imported.
 
 ---
 
-## 8. Dashboard Redirect: Role-Based (Future)
+## 8. Dashboard Redirect: Role-Based
 **What was unclear:** What happens after successful login — where do different account types go?
 
-**What we decided:** For now, both User and Space Owner accounts redirect to `/dashboard`. Dashboard will check `account_type` and show appropriate content in the next phase.
+**What we decided:** Both User and Space Owner accounts redirect to `/dashboard`. The dashboard checks `account_type` and renders role-specific content.
 
-**Why:** Keeps authentication phase simple; dashboard differentiation happens in phase 2.
+**Implemented (partial):**
+- Space owners see a **List a Space** button (links to `/spaces/new`)
+- Space owners see **Your Listings** (name + location) fetched from `GET /api/spaces/mine`
+- Regular users see placeholder sections for bookings, saved spaces, messages
 
-**Can it change?** Yes — will change when we build the dashboard pages.
+**Why:** Keeps one entry point after login; content branches on `account_type` without separate routes.
+
+**Can it change?** Yes — owner and user dashboards will gain more sections as features ship.
 
 ---
 
@@ -202,8 +245,8 @@ users:
 
 ---
 
-## 10. API Endpoints for Auth Phase
-**What we decided:**
+## 10. API Endpoints
+**Auth (implemented):**
 ```
 POST /api/auth/register
 POST /api/auth/login
@@ -211,9 +254,17 @@ POST /api/auth/logout (optional, for frontend cleanup)
 GET /api/auth/me (returns current user info if token valid)
 ```
 
-**Why:** Covers the three states in the specification (register, login, dashboard).
+**Spaces (implemented):**
+```
+POST /api/spaces          — create listing (space_owner + JWT)
+GET  /api/spaces/mine     — owner's listings, id/name/location only (space_owner + JWT)
+GET  /api/spaces          — public list of all spaces
+GET  /api/spaces/{id}     — public space detail
+```
 
-**Can it change?** Yes — will add more as features expand.
+**Why:** Auth covers login/register/dashboard access. Spaces endpoints support listing creation, owner dashboard, and future discovery/detail pages.
+
+**Can it change?** Yes — search/filter, bookings, and photos will add more routes.
 
 ---
 

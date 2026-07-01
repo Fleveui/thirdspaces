@@ -47,6 +47,8 @@ Each space card shows:
 If no results:
 - show "No spaces found. Try adjusting your filters."
 
+**Backend (partial):** `GET /api/spaces` returns all spaces with full metadata (including description and rules). Search UI, filters, proximity ordering, and space cards are not yet built.
+
 ### 3. Space Details
 Each space page shows:
 - photo gallery
@@ -57,6 +59,10 @@ Each space page shows:
 - description
 - rules
 - Book Now button
+
+**Listing creation (implemented):** Space owners can create listings via the **List a Space** form (`/spaces/new`). The form captures name, location, dimensions (area_m2), indoor/outdoor, availability (text), description, rules, space type (category), and deposit. Photos are not yet supported in the create flow.
+
+**Space detail page:** Not yet implemented — public `GET /api/spaces/{id}` returns full space data including description and rules.
 
 ### 4. Booking Request
 Users can submit a booking form with:
@@ -115,3 +121,20 @@ Owners can manage:
 - accepted bookings
 - messages
 - profile information
+
+**Implemented (partial):**
+- **List a Space** — header button and `/spaces/new` form to create a listing (`POST /api/spaces`)
+- **Your Listings** — dashboard section showing each owned space's **name** and **location** (`GET /api/spaces/mine`)
+
+**Not yet implemented:** availability calendars, booking requests, accepted bookings, messages, profile editing, listing edit/delete, photos on create.
+
+## Implementation Status (summary)
+
+| Area | Status |
+|------|--------|
+| Authentication | Done |
+| Create space listing | Done (`/spaces/new`, `POST /api/spaces`) |
+| Owner listings on dashboard | Done (name + location via `GET /api/spaces/mine`) |
+| Space search & cards | Not started |
+| Space detail page | API only (`GET /api/spaces/{id}`) |
+| Booking, chat, calendars | Not started |
