@@ -27,18 +27,18 @@ def seed_database():
         
         owner1 = BusinessAccount(
             id=owner1_id,
-            name="Marco",
+            name="Mark",
             surname="Rossi",
-            company="Spazi Sostenibili",
-            company_email="marco@spazisos.it",
+            company="Sustainable Spaces",
+            company_email="mark@sustainablespaces.com",
             created_at=datetime.utcnow()
         )
         owner2 = BusinessAccount(
             id=owner2_id,
-            name="Lucia",
-            surname="Bianchi",
-            company="Community Hub Milano",
-            company_email="lucia@communityhub.it",
+            name="Lucy",
+            surname="White",
+            company="Community Hub Milan",
+            company_email="lucy@communityhub.com",
             created_at=datetime.utcnow()
         )
         db.add(owner1)
@@ -49,55 +49,65 @@ def seed_database():
         # Create demo spaces
         spaces_data = [
             {
-                "name": "Loft Luminoso - Navigli",
+                "name": "Bright Loft - Navigli",
                 "owner_id": owner1_id,
                 "area_m2": 120.0,
                 "is_outdoor": False,
                 "category": "Loft",
                 "availability": "Weekends",
                 "deposit_needed": 500.0,
-                "location": "Via Naviglio Grande, Milano"
+                "location": "Naviglio Grande, Milan",
+                "description": "Spacious open-plan loft with large windows overlooking the Navigli canals. Ideal for workshops, exhibitions, and community gatherings.",
+                "rules": "No smoking. Respect checkout time. Final cleanup is the organizer's responsibility."
             },
             {
-                "name": "Terrazza Panoramica - Duomo",
+                "name": "Panoramic Terrace - Duomo",
                 "owner_id": owner1_id,
                 "area_m2": 80.0,
                 "is_outdoor": True,
-                "category": "Terrazza",
+                "category": "Terrace",
                 "availability": "Flexible",
                 "deposit_needed": 300.0,
-                "location": "Piazza Duomo, Milano"
+                "location": "Piazza Duomo, Milan",
+                "description": "Rooftop terrace with views of the Duomo, perfect for outdoor events, drinks, and small performances.",
+                "rules": "Maximum 40 guests. Music until 10:00 PM. No fireworks."
             },
             {
-                "name": "Atelier Creativo - Lambrate",
+                "name": "Creative Studio - Lambrate",
                 "owner_id": owner2_id,
                 "area_m2": 150.0,
                 "is_outdoor": False,
                 "category": "Studio",
                 "availability": "Weekdays 9-18",
                 "deposit_needed": 400.0,
-                "location": "Via Lambrertesca, Milano"
+                "location": "Via Lambrertesca, Milan",
+                "description": "Creative studio with natural light, work tables, and a lounge area. Suited for classes, artist residencies, and coworking.",
+                "rules": "Shared equipment must be restored after use. Minimum booking of 4 hours."
             },
             {
-                "name": "Giardino Condiviso - Porta Romana",
+                "name": "Shared Garden - Porta Romana",
                 "owner_id": owner2_id,
                 "area_m2": 200.0,
                 "is_outdoor": True,
-                "category": "Orto",
+                "category": "Garden",
                 "availability": "Daily",
                 "deposit_needed": 200.0,
-                "location": "Porta Romana, Milano"
+                "location": "Porta Romana, Milan",
+                "description": "Urban garden with a community allotment, picnic area, and space for outdoor workshops.",
+                "rules": "Respect the allotment plants. Bring bags for waste. Pets on leash only."
             },
             {
-                "name": "Sala Riunioni - Centrale",
+                "name": "Meeting Room - Central",
                 "owner_id": owner1_id,
                 "area_m2": 60.0,
                 "is_outdoor": False,
-                "category": "Ufficio",
+                "category": "Office",
                 "availability": "Hourly",
                 "deposit_needed": 150.0,
-                "location": "Via Torino, Milano"
-            }
+                "location": "Via Torino, Milan",
+                "description": "Central meeting room with Wi-Fi, projector, and whiteboard. For meetings, training, and small professional events.",
+                "rules": "Free cancellation up to 24 hours before. Return the room in its original condition."
+            },
         ]
         
         created_spaces = []
@@ -117,7 +127,7 @@ def seed_database():
         borrower = PersonalAccount(
             id=str(uuid.uuid4().hex),
             name="Alice",
-            surname="Verdi",
+            surname="Green",
             email="alice@example.com",
             password_hash=None,
             created_at=datetime.utcnow()
