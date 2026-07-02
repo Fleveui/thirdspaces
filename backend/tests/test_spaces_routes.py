@@ -92,15 +92,14 @@ class TestListMySpaces:
 
         assert response.status_code == 401
 
-    def test_list_my_spaces_as_regular_user_returns_403(
-        self, client, regular_user_token
-    ):
+    def test_list_my_spaces_as_regular_user_returns_empty(self, client, regular_user_token):
         response = client.get(
             "/api/spaces/mine",
             headers=auth_headers(regular_user_token),
         )
 
-        assert response.status_code == 403
+        assert response.status_code == 200
+        assert response.json() == []
 
 
 class TestGetSpace:
@@ -150,15 +149,15 @@ class TestCreateSpace:
 
         assert response.status_code == 401
 
-    def test_create_space_as_regular_user_returns_403(self, client, regular_user_token):
+    def test_create_space_as_regular_user(self, client, regular_user_token):
         response = client.post(
             "/api/spaces",
             json=valid_space_payload(),
             headers=auth_headers(regular_user_token),
         )
 
-        assert response.status_code == 403
-        assert response.json()["detail"] == "Only space owners can perform this action"
+        assert response.status_code == 201
+        assert response.json()["name"] == "New Loft"
 
     def test_create_space_invalid_payload_returns_422(self, client, space_owner_token):
         response = client.post(

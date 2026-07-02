@@ -59,6 +59,7 @@ class Space(Base):
     location = Column(String(255), nullable=True)
     description = Column(Text, nullable=True)
     rules = Column(Text, nullable=True)
+    exchange_preferences = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     
     def __repr__(self):
@@ -110,6 +111,10 @@ class Booking(Base):
     end_date = Column(DateTime, nullable=True)
     status = Column(String(50), default="pending", nullable=False)
     exchange_offer = Column(Text, nullable=True)
+    intended_use = Column(Text, nullable=True)
+    contract_text = Column(Text, nullable=True)
+    borrower_signed_at = Column(DateTime, nullable=True)
+    owner_signed_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     
     def __repr__(self):
@@ -129,6 +134,41 @@ class SpacePhoto(Base):
     
     def __repr__(self):
         return f"<SpacePhoto {self.photo_id}>"
+
+
+class Conversation(Base):
+    """Chat conversation tied to an approved booking."""
+    __tablename__ = "conversation"
+    __table_args__ = {'extend_existing': True}
+
+    id = Column(String, primary_key=True, default=lambda: __import__('uuid').uuid4().hex)
+    booking_id = Column(String, nullable=False, unique=True, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class Message(Base):
+    """Chat message within a conversation."""
+    __tablename__ = "message"
+    __table_args__ = {'extend_existing': True}
+
+    id = Column(String, primary_key=True, default=lambda: __import__('uuid').uuid4().hex)
+    conversation_id = Column(String, nullable=False, index=True)
+    sender_user_id = Column(String, nullable=False, index=True)
+    body = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class Rating(Base):
+    """Post-visit rating from one party about the other."""
+    __tablename__ = "rating"
+    __table_args__ = {'extend_existing': True}
+
+    id = Column(String, primary_key=True, default=lambda: __import__('uuid').uuid4().hex)
+    booking_id = Column(String, nullable=False, index=True)
+    rater_user_id = Column(String, nullable=False, index=True)
+    rating = Column(Integer, nullable=False)
+    comment = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
 
 def init_db():

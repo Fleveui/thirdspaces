@@ -1,18 +1,14 @@
 /**
- * List a Space Page
- * → see app-requirements.md #3 (Space Details)
- *
- * Space owners create a new listing via POST /api/spaces.
- * Protected: requires authentication and space_owner account type.
+ * List a Space Page — any logged-in user can create a listing.
  */
 
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useAuth } from '@/lib/auth'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
+import { AppShell } from '@/components/AppShell'
 
 const SPACE_CATEGORIES = ['Loft', 'Terrazza', 'Studio', 'Orto', 'Ufficio'] as const
 
@@ -26,6 +22,7 @@ interface FormData {
   description: string
   rules: string
   deposit_needed: string
+  exchange_preferences: string
 }
 
 const initialFormData: FormData = {
@@ -38,26 +35,17 @@ const initialFormData: FormData = {
   description: '',
   rules: '',
   deposit_needed: '',
+  exchange_preferences: '',
 }
 
 function ListSpaceContent() {
   const router = useRouter()
-  const { user, loading: authLoading } = useAuth()
 
   const [formData, setFormData] = useState<FormData>(initialFormData)
+  const [photos, setPhotos] = useState<FileList | null>(null)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
-
-  useEffect(() => {
-    if (!authLoading && user && user.account_type !== 'space_owner') {
-      router.push('/dashboard')
-    }
-  }, [user, authLoading, router])
-
-  if (!authLoading && user && user.account_type !== 'space_owner') {
-    return null
-  }
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {}
@@ -135,6 +123,9 @@ function ListSpaceContent() {
     if (formData.rules.trim()) {
       body.rules = formData.rules.trim()
     }
+    if (formData.exchange_preferences.trim()) {
+      body.exchange_preferences = formData.exchange_preferences.trim()
+    }
     if (formData.deposit_needed.trim()) {
       const deposit = parseFloat(formData.deposit_needed)
       if (!isNaN(deposit) && deposit >= 0) {
@@ -164,7 +155,22 @@ function ListSpaceContent() {
         return
       }
 
-      router.push('/dashboard')
+      const created = await response.json()
+      const spaceId = created.id
+
+      if (photos && photos.length > 0) {
+        for (let i = 0; i < Math.min(photos.length, 3); i++) {
+          const fd = new FormData()
+          fd.append('file', photos[i])
+          await fetch(`${apiUrl}/api/spaces/${spaceId}/photos`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` },
+            body: fd,
+          })
+        }
+      }
+
+      router.push('/host')
     } catch {
       setSubmitError('Failed to create space. Please try again.')
     } finally {
@@ -173,8 +179,9 @@ function ListSpaceContent() {
   }
 
   return (
-    <div className="min-h-screen bg-white flex items-center justify-center p-4">
-      <div className="card max-w-lg w-full">
+    <AppShell mode="host">
+      <div className="max-w-lg mx-auto">
+        <div className="card w-full">
         <div className="mb-8 text-center">
           <h1 className="text-2xl font-bold text-primary mb-2">List a Space</h1>
           <p className="text-gray-600">Share your space with the community</p>
@@ -324,6 +331,22 @@ function ListSpaceContent() {
           </div>
 
           <div>
+            <label htmlFor="exchange_preferences" className="block text-sm font-medium text-dark mb-1">
+              Exchange preferences
+            </label>
+            <textarea
+              id="exchange_preferences"
+              name="exchange_preferences"
+              rows={2}
+              placeholder="What would you accept in exchange? (optional)"
+              value={formData.exchange_preferences}
+              onChange={handleChange}
+              className="input resize-y"
+              disabled={submitting}
+            />
+          </div>
+
+          <div>
             <label htmlFor="deposit_needed" className="block text-sm font-medium text-dark mb-1">
               Deposit needed (€)
             </label>
@@ -336,6 +359,21 @@ function ListSpaceContent() {
               placeholder="Optional"
               value={formData.deposit_needed}
               onChange={handleChange}
+              className="input"
+              disabled={submitting}
+            />
+          </div>
+
+          <div>
+            <label htmlFor="photos" className="block text-sm font-medium text-dark mb-1">
+              Photos (up to 3)
+            </label>
+            <input
+              id="photos"
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={(e) => setPhotos(e.target.files)}
               className="input"
               disabled={submitting}
             />
@@ -357,12 +395,13 @@ function ListSpaceContent() {
         </form>
 
         <div className="mt-6 text-center text-sm text-gray-600">
-          <Link href="/dashboard" className="font-medium text-primary hover:underline">
-            Back to dashboard
+          <Link href="/host" className="font-medium text-primary hover:underline">
+            Back to My spaces
           </Link>
         </div>
       </div>
-    </div>
+      </div>
+    </AppShell>
   )
 }
 

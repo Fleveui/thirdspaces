@@ -1,23 +1,33 @@
 # Spaces API Routes
-# → see DECISIONS.md #10 (API Endpoints)
 # HTTP endpoints for viewing and managing spaces
-# Called by: frontend (see frontend/src/app/dashboard)
 
-from fastapi import APIRouter, Depends, HTTPException, status
+import os
+import uuid
+from pathlib import Path
+from typing import List, Optional
+
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
-from typing import List, Optional
-from models import Space, User
+
 from database import get_db
-from dependencies import require_space_owner
-from services.spaces import create_space, list_spaces_by_owner
+from dependencies import get_current_user
+from models import Space, User
+from services.spaces import (
+    add_space_photo,
+    create_space,
+    list_spaces_by_owner,
+    search_spaces,
+    space_to_dict,
+)
 
 router = APIRouter(prefix="/api/spaces", tags=["spaces"])
 
-# Request/Response Models (Pydantic schemas)
+UPLOAD_DIR = Path(__file__).resolve().parent.parent / "uploads"
+UPLOAD_DIR.mkdir(exist_ok=True)
+
 
 class CreateSpaceRequest(BaseModel):
-    """Incoming request to create a new space listing"""
     name: str = Field(..., min_length=1)
     location: str = Field(..., min_length=1)
     area_m2: float = Field(..., gt=0)
@@ -27,10 +37,16 @@ class CreateSpaceRequest(BaseModel):
     description: Optional[str] = None
     rules: Optional[str] = None
     deposit_needed: Optional[float] = None
+    exchange_preferences: Optional[str] = None
+
+
+class SpacePhotoItem(BaseModel):
+    photo_id: str
+    image_url: Optional[str] = None
+    position: Optional[int] = None
 
 
 class SpaceResponse(BaseModel):
-    """Space information for API responses"""
     id: str
     name: str
     owner_id: str
@@ -42,13 +58,15 @@ class SpaceResponse(BaseModel):
     location: Optional[str] = None
     description: Optional[str] = None
     rules: Optional[str] = None
+    exchange_preferences: Optional[str] = None
+    image_url: Optional[str] = None
+    photos: Optional[List[SpacePhotoItem]] = None
 
     class Config:
         from_attributes = True
 
 
 class SpaceListingSummary(BaseModel):
-    """Minimal space info for owner dashboard listings"""
     id: str
     name: str
     location: Optional[str] = None
@@ -56,76 +74,81 @@ class SpaceListingSummary(BaseModel):
     class Config:
         from_attributes = True
 
-# Endpoints
 
 @router.post("", response_model=SpaceResponse, status_code=status.HTTP_201_CREATED)
 def create_space_endpoint(
     request: CreateSpaceRequest,
-    user: User = Depends(require_space_owner),
+    user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """
-    Create a new space listing.
-
-    Requires: space_owner account with valid JWT token.
-
-    Returns:
-        201 with the created space on success; 400 on validation error.
-    """
     space, error = create_space(owner_id=user.id, data=request, db=db)
-
     if error:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=error)
-
-    return space
+    return space_to_dict(space, db)
 
 
 @router.get("/mine", response_model=List[SpaceListingSummary])
 def list_my_spaces(
-    user: User = Depends(require_space_owner),
+    user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """
-    Get spaces listed by the authenticated space owner.
-
-    Requires: space_owner account with valid JWT token.
-
-    Returns:
-        List of the owner's spaces (id, name, location only).
-    """
     return list_spaces_by_owner(owner_id=user.id, db=db)
 
 
 @router.get("", response_model=List[SpaceResponse])
-def list_spaces(db: Session = Depends(get_db)):
-    """
-    Get all available spaces
-    
-    Public endpoint - no authentication required
-    
-    Returns:
-        List of all spaces in the database
-    """
-    spaces = db.query(Space).all()
-    return spaces
+def list_spaces(
+    category: Optional[str] = None,
+    is_outdoor: Optional[bool] = None,
+    min_area: Optional[float] = None,
+    max_area: Optional[float] = None,
+    location: Optional[str] = None,
+    availability: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
+    return search_spaces(
+        db=db,
+        category=category,
+        is_outdoor=is_outdoor,
+        min_area=min_area,
+        max_area=max_area,
+        location=location,
+        availability=availability,
+    )
+
 
 @router.get("/{space_id}", response_model=SpaceResponse)
 def get_space(space_id: str, db: Session = Depends(get_db)):
-    """
-    Get details of a specific space
-    
-    Args:
-        space_id: ID of the space to retrieve
-    
-    Returns:
-        Space details or 404 if not found
-    """
     space = db.query(Space).filter(Space.id == space_id).first()
-    
     if not space:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Space {space_id} not found"
+            detail=f"Space {space_id} not found",
         )
-    
-    return space
+    return space_to_dict(space, db, include_photos=True)
+
+
+@router.post("/{space_id}/photos", status_code=status.HTTP_201_CREATED)
+async def upload_space_photo(
+    space_id: str,
+    file: UploadFile = File(...),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    space = db.query(Space).filter(Space.id == space_id).first()
+    if not space:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Space not found")
+    if space.owner_id != user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not your space")
+
+    ext = os.path.splitext(file.filename or "")[1].lower()
+    if ext not in (".jpg", ".jpeg", ".png", ".webp", ".gif"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid image type")
+
+    filename = f"{uuid.uuid4().hex}{ext}"
+    filepath = UPLOAD_DIR / filename
+    content = await file.read()
+    filepath.write_bytes(content)
+
+    image_url = f"/uploads/{filename}"
+    photo = add_space_photo(space_id=space_id, image_url=image_url, db=db)
+    return {"photo_id": photo.photo_id, "image_url": image_url}

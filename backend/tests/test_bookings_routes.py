@@ -60,13 +60,14 @@ def seed_owner_booking(
 
 
 class TestListMyBookings:
-    def test_requires_space_owner(self, client, regular_user_token):
+    def test_returns_empty_for_user_without_spaces(self, client, regular_user_token):
         response = client.get(
             "/api/bookings/mine",
             headers=auth_headers(regular_user_token),
         )
 
-        assert response.status_code == 403
+        assert response.status_code == 200
+        assert response.json() == []
 
     def test_returns_owner_bookings(self, client, space_owner_token, db):
         register_response = client.get(
@@ -164,7 +165,7 @@ class TestApproveRejectBooking:
         assert response.status_code == 400
         assert response.json()["detail"] == "Only pending bookings can be updated"
 
-    def test_regular_user_cannot_approve(self, client, regular_user_token, db):
+    def test_non_owner_cannot_approve(self, client, regular_user_token, db):
         register_user(
             client,
             username="owner2",
@@ -184,7 +185,7 @@ class TestApproveRejectBooking:
             headers=auth_headers(regular_user_token),
         )
 
-        assert response.status_code == 403
+        assert response.status_code == 404
 
 
 class TestBookingsWithCreatedSpace:
@@ -229,3 +230,49 @@ class TestBookingsWithCreatedSpace:
         assert bookings[0]["borrower_name"] == "Bob Blue"
         assert bookings[0]["space_name"] == "New Loft"
         assert bookings[0]["exchange_offer"] == "Weekend cleanup and event setup support."
+
+
+class TestCreateBooking:
+    def test_borrower_can_create_booking(self, client, space_owner_token, regular_user_token, db):
+        create_response = client.post(
+            "/api/spaces",
+            json=valid_space_payload(),
+            headers=auth_headers(space_owner_token),
+        )
+        space_id = create_response.json()["id"]
+        borrower_id = client.get(
+            "/api/auth/me",
+            headers=auth_headers(regular_user_token),
+        ).json()["id"]
+
+        response = client.post(
+            "/api/bookings",
+            json={
+                "space_id": space_id,
+                "start_date": (datetime.utcnow() + timedelta(days=2)).isoformat(),
+                "end_date": (datetime.utcnow() + timedelta(days=5)).isoformat(),
+                "intended_use": "Community workshop",
+                "exchange_offer": "Social media promotion",
+                "accepted_terms": True,
+            },
+            headers=auth_headers(regular_user_token),
+        )
+
+        assert response.status_code == 201
+        data = response.json()
+        assert data["status"] == "pending"
+        assert data["intended_use"] == "Community workshop"
+
+        list_response = client.get(
+            "/api/bookings/my-requests",
+            headers=auth_headers(regular_user_token),
+        )
+        assert list_response.status_code == 200
+        assert len(list_response.json()) == 1
+
+        owner_response = client.get(
+            "/api/bookings/mine",
+            headers=auth_headers(space_owner_token),
+        )
+        assert owner_response.status_code == 200
+        assert len(owner_response.json()) == 1

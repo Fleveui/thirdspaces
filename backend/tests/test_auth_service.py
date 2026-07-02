@@ -31,6 +31,8 @@ class TestTokens:
 
 class TestRegisterUser:
     def test_register_user_success(self, db):
+        from models import PersonalAccount
+
         user, error = register_user(
             username="alice",
             email="alice@example.com",
@@ -45,8 +47,13 @@ class TestRegisterUser:
         assert user.email == "alice@example.com"
         assert user.account_type.value == "user"
         assert verify_password("password123", user.password_hash)
+        profile = db.query(PersonalAccount).filter(PersonalAccount.id == user.id).first()
+        assert profile is not None
+        assert profile.email == "alice@example.com"
 
     def test_register_space_owner(self, db):
+        from models import BusinessAccount
+
         user, error = register_user(
             username="bob",
             email="bob@example.com",
@@ -57,6 +64,8 @@ class TestRegisterUser:
 
         assert error is None
         assert user.account_type.value == "space_owner"
+        business = db.query(BusinessAccount).filter(BusinessAccount.id == user.id).first()
+        assert business is not None
 
     def test_register_duplicate_username(self, db):
         register_user("alice", "alice@example.com", "password123", "user", db)

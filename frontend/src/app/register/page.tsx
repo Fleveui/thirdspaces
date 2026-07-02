@@ -25,6 +25,9 @@ export default function RegisterPage() {
     accountType: 'user' as AccountType,
   })
 
+  const [acceptedTerms, setAcceptedTerms] = useState(false)
+  const [acceptedPrivacy, setAcceptedPrivacy] = useState(false)
+
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   const validateForm = (): boolean => {
@@ -44,6 +47,14 @@ export default function RegisterPage() {
 
     if (formData.password !== formData.confirmPassword) {
       newErrors.confirmPassword = 'Passwords do not match'
+    }
+
+    if (!acceptedTerms) {
+      newErrors.terms = 'You must accept the terms and conditions'
+    }
+
+    if (!acceptedPrivacy) {
+      newErrors.privacy = 'You must accept the privacy policy'
     }
 
     setErrors(newErrors)
@@ -74,7 +85,7 @@ export default function RegisterPage() {
 
     try {
       await register(formData.username, formData.email, formData.password, formData.accountType)
-      router.push('/dashboard')
+      router.push('/register/verified')
     } catch {
       // Error displayed via authError
     }
@@ -175,6 +186,48 @@ export default function RegisterPage() {
             />
             {errors.confirmPassword && <p className="error-text">{errors.confirmPassword}</p>}
           </div>
+
+          <label className="flex items-start gap-2 text-sm text-gray-700 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={acceptedTerms}
+              onChange={(e) => {
+                setAcceptedTerms(e.target.checked)
+                if (errors.terms) {
+                  setErrors((prev) => {
+                    const next = { ...prev }
+                    delete next.terms
+                    return next
+                  })
+                }
+              }}
+              className="mt-1 accent-primary"
+              disabled={loading}
+            />
+            <span>I accept the terms and conditions</span>
+          </label>
+          {errors.terms && <p className="error-text">{errors.terms}</p>}
+
+          <label className="flex items-start gap-2 text-sm text-gray-700 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={acceptedPrivacy}
+              onChange={(e) => {
+                setAcceptedPrivacy(e.target.checked)
+                if (errors.privacy) {
+                  setErrors((prev) => {
+                    const next = { ...prev }
+                    delete next.privacy
+                    return next
+                  })
+                }
+              }}
+              className="mt-1 accent-primary"
+              disabled={loading}
+            />
+            <span>I accept the privacy policy</span>
+          </label>
+          {errors.privacy && <p className="error-text">{errors.privacy}</p>}
 
           {authError && (
             <div className="error-text bg-red-50 p-3 rounded-2xl border border-red-200">

@@ -9,8 +9,16 @@ export interface OwnerBooking {
   end_date: string | null
   status: string
   exchange_offer: string | null
+  intended_use?: string | null
+  contract_text?: string | null
+  borrower_signed_at?: string | null
+  owner_signed_at?: string | null
   created_at: string
+  role?: string
+  owner_id?: string
 }
+
+export type BorrowerBooking = OwnerBooking
 
 export function statusLabel(status: string): string {
   switch (status) {
@@ -22,6 +30,17 @@ export function statusLabel(status: string): string {
       return 'Rejected'
     default:
       return status
+  }
+}
+
+export function borrowerStatusMessage(status: string): string | null {
+  switch (status) {
+    case 'approved':
+      return "Fantastic! You've got the keys!"
+    case 'rejected':
+      return 'Sorry, maybe next time.'
+    default:
+      return null
   }
 }
 
@@ -39,4 +58,23 @@ export function exchangeOfferPreview(value: string | null, maxLength = 80): stri
   const trimmed = value.trim()
   if (trimmed.length <= maxLength) return trimmed
   return `${trimmed.slice(0, maxLength).trimEnd()}...`
+}
+
+export function contractFullySigned(
+  borrowerSigned: string | null | undefined,
+  ownerSigned: string | null | undefined
+): boolean {
+  return Boolean(borrowerSigned && ownerSigned)
+}
+
+export function canRateBooking(
+  status: string,
+  endDate: string | null,
+  borrowerSigned: string | null | undefined,
+  ownerSigned: string | null | undefined
+): boolean {
+  if (status !== 'approved') return false
+  if (!contractFullySigned(borrowerSigned, ownerSigned)) return false
+  if (!endDate) return true
+  return new Date(endDate) <= new Date()
 }

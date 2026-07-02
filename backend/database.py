@@ -8,40 +8,47 @@ from models import Base
 import config
 
 
-def _migrate_booking_exchange_offer(connection) -> None:
-    """Add exchange_offer column to booking table if missing (SQLite)."""
-    columns = connection.execute(text("PRAGMA table_info(booking)")).fetchall()
-    column_names = {row[1] for row in columns}
-    if "exchange_offer" not in column_names:
+def _column_exists(connection, table: str, column: str) -> bool:
+    columns = connection.execute(text(f"PRAGMA table_info({table})")).fetchall()
+    return column in {row[1] for row in columns}
+
+
+def _migrate_schema(connection) -> None:
+    """Lightweight SQLite migrations for existing databases."""
+    if not _column_exists(connection, "booking", "exchange_offer"):
         connection.execute(text("ALTER TABLE booking ADD COLUMN exchange_offer TEXT"))
+    if not _column_exists(connection, "booking", "intended_use"):
+        connection.execute(text("ALTER TABLE booking ADD COLUMN intended_use TEXT"))
+    if not _column_exists(connection, "booking", "contract_text"):
+        connection.execute(text("ALTER TABLE booking ADD COLUMN contract_text TEXT"))
+    if not _column_exists(connection, "booking", "borrower_signed_at"):
+        connection.execute(text("ALTER TABLE booking ADD COLUMN borrower_signed_at DATETIME"))
+    if not _column_exists(connection, "booking", "owner_signed_at"):
+        connection.execute(text("ALTER TABLE booking ADD COLUMN owner_signed_at DATETIME"))
+    if not _column_exists(connection, "spaces", "exchange_preferences"):
+        connection.execute(text("ALTER TABLE spaces ADD COLUMN exchange_preferences TEXT"))
 
 
 # Create database engine (SQLite)
 engine = create_engine(
     config.DATABASE_URL,
-    echo=False,  # Set to True for SQL debugging
-    connect_args={"check_same_thread": False}  # Required for SQLite + threading
+    echo=False,
+    connect_args={"check_same_thread": False},
 )
 
-# Create all tables if they don't exist
 Base.metadata.create_all(bind=engine)
 
 with engine.begin() as connection:
-    _migrate_booking_exchange_offer(connection)
+    _migrate_schema(connection)
 
-# Session factory for creating database sessions
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
 
 def get_db() -> Session:
     """
     Dependency function for FastAPI
     Provides a fresh database session for each request
     Automatically closes after request completes
-    
-    Usage in routes:
-        @app.get("/users")
-        def get_users(db: Session = Depends(get_db)):
-            return db.query(User).all()
     """
     db = SessionLocal()
     try:

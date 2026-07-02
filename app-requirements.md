@@ -132,9 +132,13 @@ Owners can manage:
 
 | Area | Status |
 |------|--------|
-| Authentication | Done |
-| Create space listing | Done (`/spaces/new`, `POST /api/spaces`) |
-| Owner listings on dashboard | Done (name + location via `GET /api/spaces/mine`) |
-| Space search & cards | Not started |
-| Space detail page | API only (`GET /api/spaces/{id}`) |
-| Booking, chat, calendars | Not started |
+| Authentication + terms + verification screen | Done |
+| Unified dashboard (search + add space) | Done |
+| Space search & cards | Done (`/spaces`, filtered `GET /api/spaces`) |
+| Space detail + Book Now | Done (`/spaces/[id]`, `POST /api/bookings`) |
+| Owner booking management | Done |
+| Borrower dashboard bookings | Done (`GET /api/bookings/my-requests`) |
+| Chat (WebSocket) | Done (`/messages`, `/api/chat/ws/{booking_id}`) |
+| Listing photos + exchange preferences | Done |
+| Contracts + ratings (simplified) | Done |
+| Saved favorites, profile editing | Not started |

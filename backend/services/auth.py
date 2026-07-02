@@ -8,7 +8,7 @@ from typing import Optional, Tuple
 import jwt
 import bcrypt
 from sqlalchemy.orm import Session
-from models import User, AccountType
+from models import User, AccountType, PersonalAccount, BusinessAccount
 import config
 
 def hash_password(password: str) -> str:
@@ -92,16 +92,40 @@ def register_user(username: str, email: str, password: str, account_type: str, d
     except KeyError:
         return None, f"Invalid account type. Must be 'user' or 'space_owner'"
     
+    password_hash = hash_password(password)
+
     # Create new user with hashed password
     new_user = User(
         username=username,
         email=email,
-        password_hash=hash_password(password),
-        account_type=acc_type
+        password_hash=password_hash,
+        account_type=acc_type,
     )
-    
+
     try:
         db.add(new_user)
+        db.flush()
+
+        if acc_type == AccountType.USER:
+            personal = PersonalAccount(
+                id=new_user.id,
+                name=username,
+                surname="",
+                email=email,
+                password_hash=password_hash,
+            )
+            db.add(personal)
+        else:
+            business = BusinessAccount(
+                id=new_user.id,
+                name=username,
+                surname="",
+                company=username,
+                company_email=email,
+                password_hash=password_hash,
+            )
+            db.add(business)
+
         db.commit()
         db.refresh(new_user)
         return new_user, None

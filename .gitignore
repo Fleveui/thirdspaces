@@ -16,6 +16,9 @@ out/
 # Local database
 *.db
 
+# Uploaded space photos
+backend/uploads/
+
 # Environment
 .env
 .env.local

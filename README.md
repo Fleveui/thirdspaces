@@ -2,7 +2,7 @@
 
 **What it does:** A web app where people can share and discover underused spaces in their community. Space owners list spaces, review booking requests, and approve or reject them. Users can browse spaces and (in a future phase) submit booking requests.
 
-**Current phase:** Authentication, space listings, owner booking management, and Match for Space UI. Chat, public search, and borrower booking forms are not yet built.
+**Current phase:** Full flowchart MVP — search, booking, owner approval, contracts, chat, ratings, and Match for Space UI.
 
 ---
 
@@ -62,8 +62,10 @@ chmod +x start.sh stop.sh  # Make scripts executable (first time only)
 1. **Landing:** Open http://localhost:3000 — splash screen with **login** and **join us!**
 2. **Register:** Click **join us!**, fill in the form, select account type
 3. **Log in:** Use your credentials (or seed user `demoowner` / `secret12` after running `python3 seed_data.py` in `backend/`)
-4. **Dashboard:** Space owners see listings and booking requests in three columns (Pending, Confirmed, Rejected)
-5. **Log out:** Click the Log Out button
+4. **Home hub:** After login you land on `/dashboard` — choose **Find a space** or **My spaces**
+5. **Find mode (`/find`):** Browse spaces, filter, book — track requests under "My booking requests"
+6. **Host mode (`/host`):** Manage listings, review incoming requests, add new spaces
+7. **Book → approve → sign → chat:** Book from a space detail page; owner approves on `/host`; both sign on booking detail; chat at `/messages`
 
 **Demo data (optional):**
 ```bash
