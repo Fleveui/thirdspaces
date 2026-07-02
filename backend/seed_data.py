@@ -126,6 +126,58 @@ def seed_database():
                 "description": "Central meeting room with Wi-Fi, projector, and whiteboard. For meetings, training, and small professional events.",
                 "rules": "Free cancellation up to 24 hours before. Return the room in its original condition."
             },
+            {
+                "name": "Alpine Loft - Centro",
+                "owner_id": owner2_id,
+                "area_m2": 95.0,
+                "is_outdoor": False,
+                "category": "Loft",
+                "availability": "Weekends",
+                "deposit_needed": 350.0,
+                "location": "Via Laurin, Bolzano",
+                "description": "Bright loft in Bolzano city centre with mountain views. Ideal for workshops, pop-up exhibitions, and small community events.",
+                "rules": "No loud music after 9 PM. Leave the space tidy after use.",
+                "exchange_preferences": "Help with social media promotion or event setup support."
+            },
+            {
+                "name": "Walther Terrace",
+                "owner_id": owner2_id,
+                "area_m2": 70.0,
+                "is_outdoor": True,
+                "category": "Terrazza",
+                "availability": "Flexible",
+                "deposit_needed": 250.0,
+                "location": "Piazza Walther, Bolzano",
+                "description": "Sunny terrace steps from Piazza Walther. Perfect for outdoor meetups, aperitivos, and summer gatherings.",
+                "rules": "Maximum 25 guests. Respect neighbours. No glass bottles on the railing.",
+                "exchange_preferences": "Catering help or photography in exchange for weekend use."
+            },
+            {
+                "name": "Makers Studio - Oltrisarco",
+                "owner_id": owner2_id,
+                "area_m2": 110.0,
+                "is_outdoor": False,
+                "category": "Studio",
+                "availability": "Weekdays 10-18",
+                "deposit_needed": 300.0,
+                "location": "Via Rafenstein, Bolzano",
+                "description": "Creative studio in Oltrisarco with workbenches, natural light, and a small kitchen. Suited for craft workshops and coworking.",
+                "rules": "Clean tools after use. Book at least 3 hours. No hazardous materials.",
+                "exchange_preferences": "Teaching a skill-sharing session for the neighbourhood."
+            },
+            {
+                "name": "Community Garden - Europa",
+                "owner_id": owner2_id,
+                "area_m2": 180.0,
+                "is_outdoor": True,
+                "category": "Orto",
+                "availability": "Daily",
+                "deposit_needed": 100.0,
+                "location": "Via Europa, Bolzano",
+                "description": "Shared garden plot with picnic tables and a toolshed. Great for gardening workshops, outdoor classes, and community dinners.",
+                "rules": "Compost organic waste on site. Do not disturb planted beds. Dogs on leash.",
+                "exchange_preferences": "Garden maintenance or composting help welcomed."
+            },
         ]
         
         created_spaces = []

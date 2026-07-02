@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from database import get_db
-from dependencies import get_current_user
+from dependencies import get_current_user, get_optional_user
 from models import Space, User
 from services.spaces import (
     add_space_photo,
@@ -103,6 +103,7 @@ def list_spaces(
     max_area: Optional[float] = None,
     location: Optional[str] = None,
     availability: Optional[str] = None,
+    user: Optional[User] = Depends(get_optional_user),
     db: Session = Depends(get_db),
 ):
     return search_spaces(
@@ -113,6 +114,7 @@ def list_spaces(
         max_area=max_area,
         location=location,
         availability=availability,
+        exclude_owner_id=user.id if user else None,
     )
 
 

@@ -46,7 +46,9 @@ function FindContent() {
       if (filters.availability) params.set('availability', filters.availability)
 
       const qs = params.toString()
-      const response = await fetch(`${apiUrl}/api/spaces${qs ? `?${qs}` : ''}`)
+      const response = await fetch(`${apiUrl}/api/spaces${qs ? `?${qs}` : ''}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      })
       if (!response.ok) throw new Error('Failed to load spaces')
       setSpaces(await response.json())
       setError(null)
@@ -55,7 +57,7 @@ function FindContent() {
     } finally {
       setLoading(false)
     }
-  }, [apiUrl, filters])
+  }, [apiUrl, filters, token])
 
   const fetchBorrowerBookings = useCallback(async () => {
     try {

@@ -7,26 +7,28 @@ thirdspaces/
 ├── backend/                         — FastAPI server (Python)
 │   ├── main.py                     — entry point, starts the server, registers routes
 │   ├── config.py                   — all configuration (ports, paths, keys)
-│   ├── models.py                   — database schema (users + 5 Excel tables)
+│   ├── models.py                   — database schema (users, spaces, bookings, chat, ratings)
 │   ├── database.py                 — SQLite connection, schema migration on startup
-│   ├── dependencies.py             — shared auth: get_current_user, require_space_owner
+│   ├── dependencies.py             — shared auth: get_current_user, get_optional_user
 │   ├── import_excel.py             — script to import data from database edt.xlsx
-│   ├── seed_data.py                — demo seed (spaces, bookings, demoowner login)
+│   ├── seed_data.py                — demo seed (Milan + Bolzano spaces, bookings, demoowner)
 │   ├── routes/
 │   │   ├── auth.py                 — API endpoints: /api/auth/* (register, login, me, logout)
-│   │   ├── spaces.py               — API endpoints: /api/spaces/* (create, list, mine, detail)
-│   │   └── bookings.py             — API endpoints: /api/bookings/* (mine, detail, approve, reject)
+│   │   ├── spaces.py               — API endpoints: /api/spaces/* (create, search, mine, photos)
+│   │   ├── bookings.py             — API endpoints: /api/bookings/* (create, mine, approve, sign, rate)
+│   │   └── chat.py                 — API endpoints: /api/chat/* + WebSocket per booking
 │   ├── services/
 │   │   ├── auth.py                 — business logic (password hashing, token generation)
-│   │   ├── spaces.py               — business logic (create_space, list_spaces_by_owner)
-│   │   └── bookings.py             — business logic (list/get/update owner bookings)
+│   │   ├── spaces.py               — business logic (create_space, search_spaces, list_by_owner)
+│   │   └── bookings.py             — business logic (create, approve/reject, contracts, ratings)
+│   ├── uploads/                    — uploaded space photos (served at /uploads/)
 │   ├── tests/
 │   │   ├── conftest.py             — pytest fixtures (in-memory DB, test client, auth tokens)
 │   │   ├── test_health.py          — health endpoint tests
 │   │   ├── test_auth_service.py    — unit tests for auth service
 │   │   ├── test_auth_routes.py     — API tests for auth routes
 │   │   ├── test_spaces_service.py  — unit tests for spaces service
-│   │   ├── test_spaces_routes.py   — API tests for spaces routes
+│   │   ├── test_spaces_routes.py   — API tests for spaces routes (incl. exclude-own)
 │   │   ├── test_bookings_service.py — unit tests for bookings service
 │   │   └── test_bookings_routes.py — API tests for bookings routes
 │   ├── pytest.ini                  — pytest configuration
@@ -44,25 +46,38 @@ thirdspaces/
 │   │   │   ├── login/
 │   │   │   │   └── page.tsx         — login form (Match for Space design)
 │   │   │   ├── register/
-│   │   │   │   └── page.tsx         — registration form
+│   │   │   │   ├── page.tsx         — registration form (terms/privacy)
+│   │   │   │   └── verified/
+│   │   │   │       └── page.tsx     — post-registration confirmation
 │   │   │   ├── dashboard/
-│   │   │   │   └── page.tsx         — protected dashboard (listings + booking columns)
+│   │   │   │   └── page.tsx         — home hub (Find a space / My spaces cards)
+│   │   │   ├── find/
+│   │   │   │   └── page.tsx         — Find mode: search, filters, my booking requests
+│   │   │   ├── host/
+│   │   │   │   └── page.tsx         — Host mode: listings, incoming requests, add space
+│   │   │   ├── messages/
+│   │   │   │   └── page.tsx         — chat conversations (WebSocket)
 │   │   │   ├── bookings/
 │   │   │   │   └── [id]/
-│   │   │   │       └── page.tsx     — booking detail (approve/reject)
+│   │   │   │       └── page.tsx     — booking detail (approve, sign, rate)
 │   │   │   ├── spaces/
+│   │   │   │   ├── page.tsx         — redirects to /find
 │   │   │   │   ├── [id]/
-│   │   │   │   │   └── page.tsx     — public space detail
+│   │   │   │   │   └── page.tsx     — space detail + Book Now
 │   │   │   │   └── new/
-│   │   │   │       └── page.tsx     — list-a-space form (space_owner only)
+│   │   │   │       └── page.tsx     — list-a-space form
 │   │   │   └── globals.css          — global styles (Tailwind, .btn, .input, .card)
 │   │   ├── components/
 │   │   │   ├── ProtectedRoute.tsx   — wrapper for authenticated pages
+│   │   │   ├── AppShell.tsx         — page shell with header and back links
+│   │   │   ├── ModeNav.tsx          — Find | My spaces header toggle
+│   │   │   ├── BookingGroups.tsx    — three-column booking request layout
 │   │   │   ├── LogoMark.tsx         — purple circle logo (house + sparkle)
 │   │   │   └── PasswordInput.tsx    — password field with visibility toggle
 │   │   └── lib/
 │   │       ├── auth.tsx             — React Context for authentication state
-│   │       └── bookings.ts          — booking types, date/status helpers
+│   │       ├── bookings.ts          — booking types, date/status helpers
+│   │       └── spaces.ts            — space types and search helpers
 │   ├── package.json                 — Node dependencies (Next.js, Tailwind, shadcn/ui)
 │   ├── tsconfig.json                — TypeScript configuration
 │   ├── tailwind.config.js           — Tailwind CSS customization
@@ -93,7 +108,8 @@ thirdspaces/
 
 **main.py**
 - Entry point for the FastAPI server
-- Imports and registers auth, spaces, and bookings routes
+- Imports and registers auth, spaces, bookings, and chat routes
+- Mounts `/uploads/` for space photos
 - Sets up CORS for frontend communication
 
 **config.py**
@@ -102,84 +118,86 @@ thirdspaces/
 
 **models.py**
 - Database schema definitions using SQLAlchemy ORM
-- Tables: `users` (JWT auth), `personal_account`, `business_account`, `spaces`, `booking`, `space_photo`
-- `spaces` includes `description` and `rules` (Text, nullable) for listing details
-- `booking` includes `exchange_offer` (Text, nullable) for what the borrower offers in exchange
+- Tables: `users`, `personal_account`, `business_account`, `spaces`, `booking`, `space_photo`, `conversation`, `message`, `rating`
+- `spaces` includes `description`, `rules`, `exchange_preferences`
+- `booking` includes `exchange_offer`, `intended_use`, contract fields, signing timestamps
 
 **database.py**
 - Manages SQLite connection
 - Provides `get_db()` dependency for FastAPI routes
 - Creates tables on startup
-- Runs lightweight migrations (e.g. adds `exchange_offer` to `booking` if missing)
+- Runs lightweight migrations (e.g. adds new columns if missing)
 
 **dependencies.py**
 - Shared FastAPI auth dependencies used across routes
-- `get_current_user()` — verifies JWT from `Authorization: Bearer` header
-- `require_space_owner()` — returns 403 if `account_type` is not `space_owner`
+- `get_current_user()` — verifies JWT from `Authorization: Bearer` header (required)
+- `get_optional_user()` — returns user if valid token present, else `None` (for public search)
 
 **routes/auth.py**
 - HTTP endpoints for authentication
-- `POST /api/auth/register` — create new account
+- `POST /api/auth/register` — create new account (links PersonalAccount or BusinessAccount)
 - `POST /api/auth/login` — authenticate and get JWT token
 - `GET /api/auth/me` — get current user info (requires token)
 - `POST /api/auth/logout` — client-side cleanup
 
 **routes/spaces.py**
 - HTTP endpoints for space listings
-- `POST /api/spaces` — create listing (space_owner + JWT)
-- `GET /api/spaces/mine` — owner's listings, id/name/location only (space_owner + JWT)
-- `GET /api/spaces` — public list of all spaces
+- `POST /api/spaces` — create listing (any logged-in user + JWT)
+- `GET /api/spaces/mine` — owner's listings (JWT)
+- `GET /api/spaces` — search/filter; excludes own listings when authenticated
 - `GET /api/spaces/{id}` — public space detail
+- `POST /api/spaces/{id}/photos` — upload space photo
 
 **routes/bookings.py**
-- HTTP endpoints for space owner booking management
-- `GET /api/bookings/mine` — all bookings for owner's spaces (space_owner + JWT)
-- `GET /api/bookings/{id}` — single booking detail
-- `PATCH /api/bookings/{id}/approve` — approve pending booking
-- `PATCH /api/bookings/{id}/reject` — reject pending booking
+- HTTP endpoints for booking lifecycle
+- `POST /api/bookings` — borrower creates booking request
+- `GET /api/bookings/mine` — owner's incoming requests
+- `GET /api/bookings/my-requests` — borrower's outgoing requests
+- `GET /api/bookings/{id}` — booking detail (owner or borrower)
+- `PATCH /api/bookings/{id}/approve|reject|sign` — owner actions and contract signing
+- `POST /api/bookings/{id}/rate` — post-visit rating
+
+**routes/chat.py**
+- REST + WebSocket chat for approved bookings
+- `GET /api/chat/conversations` — list conversations for current user
+- `GET /api/chat/{id}/messages` — message history
+- WebSocket `/api/chat/ws/{booking_id}` — real-time messaging
 
 **services/bookings.py**
-- Business logic for owner booking requests
-- `list_bookings_for_owner()` — joins booking, space, personal_account
-- `get_booking_for_owner()` — single booking with authorization check
-- `update_booking_status()` — pending → approved | rejected only
+- Business logic for full booking lifecycle
+- `create_booking()`, `list_bookings_for_owner()`, `list_bookings_for_borrower()`
+- Approve/reject, contract generation and signing, ratings
 
 **services/auth.py**
 - Business logic for authentication
 - Password hashing with bcrypt
 - JWT token generation and verification
-- User registration and login validation
+- User registration (creates linked account record) and login validation
 
 **services/spaces.py**
 - Business logic for space listings
 - `create_space()` — validates fields, sets `owner_id` from authenticated `users.id`
+- `search_spaces(exclude_owner_id)` — filterable search for Find mode
 - `list_spaces_by_owner()` — returns spaces for the current owner, newest first
 
 **import_excel.py**
 - Standalone script to import data from Excel file
 - Reads: database edt.xlsx (5 sheets)
 - Creates: ORM objects and saves to SQLite
-- Handles mapping:
-  - "personal account" sheet → personal_account table
-  - "buissiness account" sheet → business_account table
-  - "space" sheet → space table
-  - "Booking" sheet → booking table
-  - "item photo" sheet → space_photo table
 - Usage: `python3 import_excel.py`
-- Note: Does NOT import passwords (security: set via registration)
-- Idempotent: safe to run multiple times
 - See DECISIONS.md #12 and #13 for details
 
 **seed_data.py**
 - Standalone script to populate demo data in English
-- Clears and re-seeds business accounts, spaces, bookings (pending/approved/rejected), exchange_offer text
-- Creates demo login `demoowner` / `secret12` (User.id matches owner1 business account)
+- Clears and re-seeds business accounts, spaces, bookings (pending/approved/rejected)
+- Milan spaces on owner1; 4 Bolzano spaces on owner2 (Alpine Loft, Walther Terrace, Makers Studio, Community Garden)
+- Creates demo login `demoowner` / `secret12` (User.id matches owner1)
 - Usage: `python3 seed_data.py`
 
 **tests/**
 - Pytest suite run from `backend/` with `pytest`
 - Uses in-memory SQLite and dependency overrides (see `conftest.py`)
-- Covers auth, spaces, and bookings routes/services (58 tests)
+- Covers auth, spaces (incl. exclude-own when authenticated), bookings, and chat (61+ tests)
 
 ### Frontend Files
 
@@ -189,59 +207,70 @@ thirdspaces/
 - Wraps entire app with `AuthProvider`
 - App title: Match for Space
 
-**src/lib/bookings.ts**
-- TypeScript types for owner booking API responses
-- Helpers: `statusLabel`, `formatDate`, `formatDateRange`, `exchangeOfferPreview`
+**src/components/AppShell.tsx**
+- Shared page shell for Find/Host/task pages
+- Header with `LogoMark`, `ModeNav`, logout
+- Configurable back link (e.g. to `/find` or `/host`)
 
-**src/components/LogoMark.tsx**
-- SVG logo: purple circle with white house outline and sparkle
+**src/components/ModeNav.tsx**
+- Persistent header toggle: **Find** | **My spaces**
+- Highlights active mode based on current route
 
-**src/components/PasswordInput.tsx**
-- Password input with visibility toggle and `SparkleIcon` helper
-
-**src/app/login/page.tsx**
-- Login page ("Wow you're back!" — Match for Space design)
-- Username + `PasswordInput`, forgot-password link (UI only)
-- On success: redirects to /dashboard
-
-**src/app/register/page.tsx**
-- Registration page ("Nice to meet you!")
-- Account type, username, email, passwords via `PasswordInput`
-- On success: automatically logs in and redirects to dashboard
+**src/components/BookingGroups.tsx**
+- Reusable three-column layout for booking requests
+- Groups: Pending Approval, Confirmed, Rejected
+- Used on `/host` and `/find` (my requests)
 
 **src/app/dashboard/page.tsx**
 - Protected route (requires authentication)
-- Header with `LogoMark` and Match for Space branding
-- Space owners: **List a Space**, **Your Listings** (links to `/spaces/{id}`)
-- **Booking Requests** in three columns: Pending Approval, Confirmed, Rejected
-- Pending bookings: inline Accept/Reject; all rows link to `/bookings/{id}`
-- Regular users: placeholder sections for bookings, saved spaces, messages
+- Home hub with two mode cards: Find a space → `/find`, My spaces → `/host`
+- Optional badges for pending counts
+
+**src/app/find/page.tsx**
+- Find mode: search and filter spaces
+- Sends `Authorization` header so own listings are excluded
+- "My booking requests" section via `BookingGroups`
+
+**src/app/host/page.tsx**
+- Host mode: your listings, incoming booking requests
+- "Add a space" CTA → `/spaces/new`
+- Uses `AppShell` + `ModeNav`
+
+**src/app/messages/page.tsx**
+- Chat UI: conversation list and WebSocket messaging per booking
+
+**src/app/register/verified/page.tsx**
+- Post-registration confirmation screen
+
+**src/lib/spaces.ts**
+- TypeScript types for space API responses
+- Search/filter helpers for Find mode
+
+**src/lib/bookings.ts**
+- TypeScript types for booking API responses
+- Helpers: `statusLabel`, `formatDate`, `formatDateRange`, `exchangeOfferPreview`
 
 **src/app/bookings/[id]/page.tsx**
-- Protected route for space owners only
-- Fetches booking via `GET /api/bookings/{id}`
-- Shows space, borrower, dates, exchange_offer, status
-- Accept/Reject buttons for pending bookings
+- Protected route for owner or borrower
+- Approve/reject (owner), contract signing (both), ratings (after visit)
 
 **src/app/spaces/[id]/page.tsx**
-- Public route (no ProtectedRoute)
-- Fetches space via `GET /api/spaces/{id}`
-- Displays name, location, description, rules with empty-state fallbacks
-- Handles loading, 404, and error states
-- Link back to `/dashboard`
+- Space detail with description, rules, exchange_preferences, photos
+- Book Now form for authenticated users
+- Uses `AppShell` with back link to `/find`
 
 **src/app/spaces/new/page.tsx**
-- Protected route for space owners only
+- Protected route for any logged-in user
 - Form to create a listing (`POST /api/spaces`)
-- Fields: name, location, area, category, indoor/outdoor, availability, description, rules, deposit
-- Redirects non-owners to `/dashboard`
-- On success: redirects to `/dashboard`
+- On success: redirects to `/host`
+
+**src/app/spaces/page.tsx**
+- Redirects to `/find` (legacy route)
 
 **src/components/ProtectedRoute.tsx**
 - Wrapper component for pages that require authentication
 - Checks if user is logged in
 - Redirects to /login if not authenticated
-- Shows loading state while checking
 
 **src/app/page.tsx**
 - Landing splash (/)
@@ -254,33 +283,6 @@ thirdspaces/
 - `useAuth()` hook provides: user, login(), register(), logout(), loading, error
 - Stores JWT token in localStorage (see DECISIONS.md #5)
 
-**globals.css**
-- Tailwind CSS imports
-- Shared design system: `.card`, `.btn-primary`, `.btn-outline`, `.btn-secondary`, `.input`
-- Primary color `#a166ff` via Tailwind `primary` token
-
-**tailwind.config.js**
-- Tailwind CSS customization
-- Match for Space palette: `primary` (#a166ff), `primary-dark`, `primary-light`
-
-**tsconfig.json**
-- TypeScript compiler configuration
-- Sets up path aliases (@/* points to src/*)
-
-**.env.local**
-- Frontend environment variables (not committed to git)
-- Sets API URL: `NEXT_PUBLIC_API_URL=http://localhost:8000`
-
-**requirements.txt**
-- Python dependencies for backend
-- Key packages: FastAPI, SQLAlchemy, passlib (bcrypt), PyJWT
-
-**requirements-dev.txt**
-- Dev/test dependencies: pytest, httpx
-
-**pytest.ini**
-- Pytest root config for `backend/tests/`
-
 ### Docker & Orchestration
 
 **docker-compose.yml**
@@ -289,60 +291,15 @@ thirdspaces/
 - Establishes network between services
 - Health checks for both services
 
-**backend/Dockerfile**
-- Python 3.11 slim image
-- Installs dependencies from requirements.txt
-- Runs main.py on port 8000
-
-**frontend/Dockerfile**
-- Node 18 alpine image
-- Installs npm dependencies
-- Runs `npm run dev` on port 3000
-
-**start.sh**
-- Bash script to start everything
-- Checks for Docker installation
-- Runs `docker-compose up -d`
-- Waits for services to be healthy
-- Opens app in default browser
-
-**stop.sh**
-- Bash script to stop all services
-- Runs `docker-compose down`
+**start.sh** / **stop.sh**
+- Bash scripts to start/stop all services via Docker Compose
 
 ### Documentation
 
-**DECISIONS.md**
-- Documents every implementation choice
-- Explains what was unclear in the spec, what was decided, why, and alternatives
-- Reference point when modifying the system
-
-**ARCHITECTURE.md**
-- ASCII diagram showing how components connect
-- Explanation of tech stack choices
-- Data flow walkthrough (auth, listings, space detail, owner bookings)
-- Frontend design system (Match for Space)
-- Component list with how each runs
-
-**STRUCTURE.md**
-- This file
-- Complete file tree with one-line descriptions
-- Explains what each file does and why it exists
-
-**ERRORS.md**
-- Log of errors encountered during development
-- What caused each error
-- How it was fixed
-- Learning outcome: building software is iterative
-
-**README.md**
-- User-facing documentation
-- Prerequisites and setup instructions
-- How to run and stop the system
-- Troubleshooting common issues
-
-**AGENTS.md**
-- Conventions and context for AI agents editing this repo
+**DECISIONS.md** — implementation choices and rationale
+**ARCHITECTURE.md** — system diagram, data flows, current phase
+**STRUCTURE.md** — this file
+**README.md** — user-facing setup and usage guide
 
 ## Data Flow: Authentication
 
@@ -350,54 +307,46 @@ thirdspaces/
 2. If logged in → redirect to `/dashboard`; otherwise show **login** / **join us!** buttons
 3. User opens **/login** or **/register** and submits credentials
 4. Frontend calls `POST /api/auth/login` or `POST /api/auth/register` (via useAuth)
-5. Backend **routes/auth.py** receives request
-6. **services/auth.py** validates credentials against **models.py** (users table in SQLite)
-7. If valid: **services/auth.py** creates JWT token using **config.py** SECRET_KEY
-8. Backend returns token + user info to frontend
-9. Frontend stores token in localStorage (via AuthProvider in **src/lib/auth.tsx**)
-10. Frontend redirects to **/dashboard**
-11. **src/app/dashboard/page.tsx** (wrapped in ProtectedRoute) displays user info and owner tools
-12. User can log out → clears token → can return to landing or login
+5. Backend **routes/auth.py** → **services/auth.py** → JWT + user info
+6. Register with terms acceptance → redirect to **/register/verified**, then login
+7. Frontend stores token in localStorage → redirects to **/dashboard** (home hub)
 
-## Data Flow: Space Listings (Space Owner)
+## Data Flow: Find Mode
 
-1. Owner clicks **List a Space** on dashboard → **/spaces/new**
-2. Owner submits form → `POST /api/spaces` with Bearer token
-3. **dependencies.py** → `require_space_owner` → **services/spaces.py** → `create_space()`
-4. New row in `spaces` table (`owner_id` = `users.id`)
-5. Redirect to dashboard
-6. Dashboard calls `GET /api/spaces/mine` → renders **Your Listings** (name + location, each linking to `/spaces/{id}`)
+1. User chooses **Find a space** on hub → **/find**
+2. `GET /api/spaces` with Bearer token → backend excludes own listings
+3. User filters by location/category → clicks space → **/spaces/{id}**
+4. Book Now → `POST /api/bookings` → request appears in **My booking requests** on `/find`
 
-## Data Flow: Space Detail Page
+## Data Flow: Host Mode
 
-1. User clicks listing on dashboard or opens `/spaces/{id}` directly
-2. **src/app/spaces/[id]/page.tsx** reads id from URL
-3. `GET /api/spaces/{id}` (no auth) → **routes/spaces.py**
-4. Page renders name, location, description, rules (or loading / 404 / error)
+1. User chooses **My spaces** on hub → **/host**
+2. `GET /api/spaces/mine` → listings with links to `/spaces/{id}`
+3. `GET /api/bookings/mine` → **BookingGroups** (pending / confirmed / rejected)
+4. Add a space → **/spaces/new** → `POST /api/spaces` → back to `/host`
 
-## Data Flow: Owner Booking Requests
+## Data Flow: Booking Lifecycle
 
-1. Space owner dashboard calls `GET /api/bookings/mine` with Bearer token
-2. **routes/bookings.py** → **services/bookings.py** → joins booking, space, personal_account
-3. Dashboard renders three columns: Pending Approval, Confirmed, Rejected
-4. Owner clicks Accept/Reject on pending row → `PATCH /api/bookings/{id}/approve|reject`
-5. Owner opens `/bookings/{id}` for full detail including `exchange_offer`
+1. Borrower books from space detail → status `pending`
+2. Owner approves on `/host` or `/bookings/{id}` → `PATCH approve`
+3. Both sign contract on `/bookings/{id}` → `PATCH sign`
+4. After visit → `POST /api/bookings/{id}/rate`
+5. Chat available at `/messages` via WebSocket
 
 ## Current Phase
 
 **Implemented:**
 - **Match for Space UI** — purple `#a166ff`, IBM Plex Sans, landing splash, redesigned login/register
-- Authentication (login, register, dashboard)
-- Create space listing (`/spaces/new`, `POST /api/spaces`)
-- Owner listings on dashboard with links to `/spaces/{id}`
-- Minimal space detail page (`/spaces/[id]`)
-- Owner booking management: list, detail, approve/reject (`/api/bookings/*`)
-- Booking `exchange_offer` field (what borrower offers in exchange)
-- Demo seed data with `demoowner` / `secret12`
-- Backend tests for auth, spaces, and bookings (58 tests)
+- **Find/Host split** — `/dashboard` hub, `/find`, `/host`, `ModeNav`, `AppShell`
+- Authentication with linked account records and `/register/verified`
+- Space search with filters; own listings excluded when authenticated
+- Create listing, photo upload, `exchange_preferences`
+- Full booking lifecycle: request, approve/reject, contracts, ratings
+- Real-time chat (`/messages`, WebSocket)
+- Demo seed: Milan + Bolzano spaces, `demoowner` / `secret12`
+- Backend tests (61+)
 
 **Next:**
-- Borrower booking request form (`POST /api/bookings`)
-- Space search UI and filters
-- Full detail page (photo gallery, calendar, Book Now)
-- Chat, user dashboard sections, photo upload
+- Availability calendar widget
+- Saved spaces / favourites
+- Production deployment (PostgreSQL, HTTPS, refresh tokens)

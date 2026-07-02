@@ -49,6 +49,27 @@ def get_current_user(
     return user
 
 
+def get_optional_user(
+    authorization: Optional[str] = Header(None), db: Session = Depends(get_db)
+) -> Optional[User]:
+    """Return the authenticated user if a valid Bearer token is present, else None."""
+    if not authorization:
+        return None
+
+    try:
+        scheme, token = authorization.split()
+        if scheme.lower() != "bearer":
+            return None
+    except ValueError:
+        return None
+
+    user_id = verify_token(token)
+    if not user_id:
+        return None
+
+    return get_user_by_id(user_id, db)
+
+
 def require_space_owner(user: User = Depends(get_current_user)) -> User:
     if user.account_type != AccountType.SPACE_OWNER:
         raise HTTPException(

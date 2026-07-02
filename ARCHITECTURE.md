@@ -16,11 +16,15 @@
 │  │  /           │  │  /login      │  │ /register    │        │
 │  └──────────────┘  └──────────────┘  └──────────────┘        │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐        │
-│  │  Dashboard   │  │ List Space   │  │ Space Detail │        │
-│  │  /dashboard  │  │ /spaces/new  │  │ /spaces/[id] │        │
+│  │  Home Hub    │  │  Find Mode   │  │  Host Mode   │        │
+│  │  /dashboard  │  │  /find       │  │  /host       │        │
 │  └──────────────┘  └──────────────┘  └──────────────┘        │
-│  ┌──────────────┐                                            │
-│  │ Booking Dtl  │  (space_owner only)                         │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐        │
+│  │ List Space   │  │ Space Detail │  │  Messages    │        │
+│  │ /spaces/new  │  │ /spaces/[id] │  │  /messages   │        │
+│  └──────────────┘  └──────────────┘  └──────────────┘        │
+│  ┌──────────────┐  AppShell + ModeNav (Find | My spaces)      │
+│  │ Booking Dtl  │  /register/verified (post-signup)            │
 │  │ /bookings/id │                                            │
 │  └──────────────┘                                            │
 │         │                 │                   │               │
@@ -44,11 +48,17 @@
                        │ POST /api/auth/register
                        │ GET /api/auth/me
                        │ POST /api/spaces
+                       │ GET /api/spaces (optional auth; excludes own listings)
                        │ GET /api/spaces/mine
                        │ GET /api/spaces/{id}
+                       │ POST /api/bookings
                        │ GET /api/bookings/mine
+                       │ GET /api/bookings/my-requests
                        │ GET /api/bookings/{id}
-                       │ PATCH /api/bookings/{id}/approve|reject
+                       │ PATCH /api/bookings/{id}/approve|reject|sign
+                       │ POST /api/bookings/{id}/rate
+                       │ GET /api/chat/conversations
+                       │ WebSocket /api/chat/ws/{booking_id}
                        ▼
 ┌──────────────────────────────────────────────────────────────┐
 │        Backend (FastAPI)  http://localhost:8000               │
@@ -57,7 +67,7 @@
 │  │  main.py (entry point)                                 │  │
 │  │  - starts FastAPI server                               │  │
 │  │  - enables CORS for frontend                           │  │
-│  │  - includes auth, spaces, and bookings routes            │  │
+│  │  - includes auth, spaces, bookings, and chat routes       │  │
 │  └────────────────────────────────────────────────────────┘  │
 │                       │                                       │
 │  ┌────────────────────▼────────────────────────────────────┐  │
@@ -70,24 +80,34 @@
 │                       │                                       │
 │  ┌────────────────────▼────────────────────────────────────┐  │
 │  │  routes/spaces.py (HTTP endpoints)                     │  │
-│  │  - POST /api/spaces (create listing, owner only)       │  │
-│  │  - GET /api/spaces/mine (owner's listings, owner only) │  │
-│  │  - GET /api/spaces (public list)                       │  │
+│  │  - POST /api/spaces (create listing, any logged-in user) │  │
+│  │  - GET /api/spaces/mine (owner's listings)               │  │
+│  │  - GET /api/spaces (search; excludes own if authed)      │  │
 │  │  - GET /api/spaces/{id} (public detail)                │  │
+│  │  - POST /api/spaces/{id}/photos (upload image)         │  │
 │  └────────────────────┬───────────────────────────────────┘  │
 │                       │                                       │
 │  ┌────────────────────▼────────────────────────────────────┐  │
 │  │  routes/bookings.py (HTTP endpoints)                   │  │
-│  │  - GET /api/bookings/mine (owner's booking requests)   │  │
-│  │  - GET /api/bookings/{id} (booking detail)             │  │
-│  │  - PATCH /api/bookings/{id}/approve                    │  │
-│  │  - PATCH /api/bookings/{id}/reject                     │  │
+│  │  - POST /api/bookings (borrower booking request)       │  │
+│  │  - GET /api/bookings/mine (owner incoming requests)    │  │
+│  │  - GET /api/bookings/my-requests (borrower requests)   │  │
+│  │  - GET /api/bookings/{id} (owner or borrower)          │  │
+│  │  - PATCH approve|reject|sign                           │  │
+│  │  - POST /api/bookings/{id}/rate                        │  │
+│  └────────────────────┬───────────────────────────────────┘  │
+│                       │                                       │
+│  ┌────────────────────▼────────────────────────────────────┐  │
+│  │  routes/chat.py (WebSocket + REST)                     │  │
+│  │  - GET /api/chat/conversations                         │  │
+│  │  - GET /api/chat/{id}/messages                         │  │
+│  │  - WebSocket /api/chat/ws/{booking_id}                 │  │
 │  └────────────────────┬───────────────────────────────────┘  │
 │                       │                                       │
 │  ┌────────────────────▼────────────────────────────────────┐  │
 │  │  dependencies.py (shared auth)                         │  │
-│  │  - get_current_user() [JWT from Authorization header]  │  │
-│  │  - require_space_owner() [403 if not space_owner]      │  │
+│  │  - get_current_user() [required JWT]                   │  │
+│  │  - get_optional_user() [JWT if present, else None]     │  │
 │  └────────────────────┬───────────────────────────────────┘  │
 │                       │                                       │
 │  ┌────────────────────▼────────────────────────────────────┐  │
@@ -102,15 +122,14 @@
 │                       │                                       │
 │  ┌────────────────────▼────────────────────────────────────┐  │
 │  │  services/spaces.py (business logic)                   │  │
-│  │  - create_space()                                       │  │
-│  │  - list_spaces_by_owner()                               │  │
+│  │  - create_space(), list_spaces_by_owner()              │  │
+│  │  - search_spaces(exclude_owner_id) — Find mode filter  │  │
 │  └────────────────────┬───────────────────────────────────┘  │
 │                       │                                       │
 │  ┌────────────────────▼────────────────────────────────────┐  │
 │  │  services/bookings.py (business logic)                 │  │
-│  │  - list_bookings_for_owner()                            │  │
-│  │  - get_booking_for_owner()                              │  │
-│  │  - update_booking_status()                              │  │
+│  │  - create_booking(), list for owner/borrower           │  │
+│  │  - approve/reject, contract signing, ratings           │  │
 │  └────────────────────┬───────────────────────────────────┘  │
 │                       │                                       │
 │  ┌────────────────────▼────────────────────────────────────┐  │
@@ -147,12 +166,15 @@
 │  - space (available spaces)                                  │
 │      • id, name, owner_id, area_m2, is_outdoor,             │
 │      • category, availability, deposit_needed, location,     │
-│      • description, rules                                    │
+│      • description, rules, exchange_preferences            │
 │  - booking (reservation requests)                            │
 │      • booking_id, space_id, borrower_id, start_date,       │
-│      • end_date, status, exchange_offer, created_at          │
+│      • end_date, status, exchange_offer, intended_use,      │
+│      • contract_text, borrower_signed_at, owner_signed_at   │
 │  - space_photo (images)                                      │
 │      • photo_id, space_id, image_url, position               │
+│  - conversation, message (chat)                              │
+│  - rating (post-visit ratings)                               │
 │                                                               │
 │  Relationships:                                              │
 │  users (space_owner) → space.owner_id                        │
@@ -267,7 +289,7 @@
 
 ```
 1. User fills registration form
-   (username, email, password, account_type)
+   (username, email, password, account_type, accept terms/privacy)
    ↓
 2. Frontend validation
    - username min 3 chars
@@ -291,7 +313,7 @@
    ↓
 7. Hash password (services/auth.py → bcrypt)
    ↓
-8. Create User record in database
+8. Create User record + linked PersonalAccount or BusinessAccount
    ↓
 9. Return user object (no password hash exposed)
    {
@@ -302,9 +324,9 @@
      "message": "Account created successfully!"
    }
    ↓
-10. Frontend: automatically calls login() with same credentials
+10. Frontend: redirects to /register/verified
    ↓
-11. Proceed to login flow (see below)
+11. User proceeds to login flow (see below)
 ```
 
 ## Data Flow: User Login
@@ -383,19 +405,55 @@
    ↓
 6. Frontend receives user info
    ↓
-7. Dashboard renders with user information
+7. Dashboard (hub) renders mode selection cards
+   - Find a space → /find
+   - My spaces → /host
 ```
 
-## Data Flow: Create Space Listing (Space Owner)
+## Data Flow: Home Hub and Find/Host Modes
 
 ```
-1. Space owner clicks "List a Space" on dashboard
+1. User logs in → redirects to /dashboard (home hub)
    ↓
-2. Navigates to /spaces/new (ProtectedRoute + account_type check)
+2. Hub shows two mode cards:
+   - Find a space → /find
+   - My spaces → /host
+   Optional badges for pending booking requests
    ↓
-3. Owner fills form:
+3. AppShell wraps /find and /host with ModeNav toggle
+   (persistent header: Find | My spaces)
+   ↓
+4. /spaces redirects to /find (legacy route)
+```
+
+## Data Flow: Find Mode (Space Search)
+
+```
+1. User opens /find (ProtectedRoute)
+   ↓
+2. GET /api/spaces?location=&category=&...
+   Headers: Authorization: Bearer <token> (when logged in)
+   ↓
+3. Backend: get_optional_user() — if token present, exclude owner's spaces
+   services/spaces.py → search_spaces(exclude_owner_id=user.id)
+   ↓
+4. Frontend renders filterable grid of spaces (not your own listings)
+   ↓
+5. User clicks space → /spaces/{id} → Book Now flow
+   ↓
+6. GET /api/bookings/my-requests → "My booking requests" section on /find
+```
+
+## Data Flow: Create Space Listing (Any Logged-in User)
+
+```
+1. User clicks "Add a space" on /host (or hub)
+   ↓
+2. Navigates to /spaces/new (ProtectedRoute)
+   ↓
+3. User fills form:
    name, location, area_m2, category, is_outdoor,
-   availability, description, rules, deposit_needed
+   availability, description, rules, exchange_preferences, deposit_needed
    ↓
 4. Frontend validation (required fields, area > 0)
    ↓
@@ -403,39 +461,87 @@
    Headers: Authorization: Bearer <token>
    Body: CreateSpaceRequest JSON
    ↓
-6. Backend: require_space_owner dependency
+6. Backend: get_current_user dependency
    - No/invalid token → 401
-   - account_type != space_owner → 403
    ↓
 7. services/spaces.py → create_space(owner_id=user.id, ...)
-   - Validates name, location, area_m2, category
-   - Sets owner_id from authenticated users.id (not business_account)
    ↓
-8. INSERT into spaces table (includes description, rules)
+8. INSERT into spaces table
    ↓
 9. Return 201 + SpaceResponse
    ↓
-10. Frontend redirects to /dashboard
+10. Frontend redirects to /host
 ```
 
-## Data Flow: Owner Dashboard Listings
+## Data Flow: Host Mode (Owner Listings & Requests)
 
 ```
-1. Space owner loads /dashboard
+1. User loads /host (ProtectedRoute + AppShell)
    ↓
-2. useEffect detects account_type === 'space_owner'
-   ↓
-3. GET /api/spaces/mine
+2. GET /api/spaces/mine
    Headers: Authorization: Bearer <token>
    ↓
-4. Backend: require_space_owner → list_spaces_by_owner(user.id)
+3. Backend: list_spaces_by_owner(user.id)
    ↓
-5. Return list of SpaceListingSummary:
-   { id, name, location } only
+4. GET /api/bookings/mine → incoming requests
    ↓
-6. Dashboard renders "Your Listings" section
-   - Each row: space name + location (links to /spaces/{id})
-   - Empty state links to /spaces/new
+5. Host page renders:
+   - Your listings (links to /spaces/{id})
+   - Booking requests via BookingGroups (pending / confirmed / rejected)
+   - "Add a space" CTA → /spaces/new
+```
+
+## Data Flow: Borrower Booking Request
+
+```
+1. User opens /spaces/{id} and clicks Book Now
+   ↓
+2. Fills dates, intended use, exchange offer
+   ↓
+3. POST /api/bookings
+   Headers: Authorization: Bearer <token>
+   Body: { space_id, start_date, end_date, intended_use, exchange_offer }
+   ↓
+4. services/bookings.py → create_booking()
+   - Status: pending
+   ↓
+5. Borrower sees request on /find (My booking requests)
+   Owner sees it on /host (incoming requests)
+```
+
+## Data Flow: Contract Signing & Ratings
+
+```
+1. Owner approves booking → PATCH /api/bookings/{id}/approve
+   ↓
+2. Both parties open /bookings/{id}
+   ↓
+3. Contract text shown; each signs via PATCH /api/bookings/{id}/sign
+   ↓
+4. After visit: POST /api/bookings/{id}/rate (borrower or owner)
+```
+
+## Data Flow: Real-time Chat
+
+```
+1. User opens /messages
+   ↓
+2. GET /api/chat/conversations (bookings with chat access)
+   ↓
+3. User selects conversation → WebSocket /api/chat/ws/{booking_id}
+   Headers: Authorization via query or handshake
+   ↓
+4. Messages persisted in message table; broadcast to connected clients
+```
+
+## Data Flow: Owner Dashboard Listings (legacy — see Host Mode)
+
+```
+1. Space owner loads /host (formerly combined on /dashboard)
+   ↓
+2. GET /api/spaces/mine + GET /api/bookings/mine
+   ↓
+3. Listings and booking columns rendered via BookingGroups
 ```
 
 ## Data Flow: Space Detail Page
@@ -454,29 +560,32 @@
    ↓
 6. Detail page renders:
    - name (title)
-   - location, description, rules (with fallbacks for empty fields)
-   - "Back to dashboard" link
+   - location, description, rules, exchange_preferences
+   - Book Now form (authenticated users)
+   - Photo gallery when photos exist
+   - AppShell back link to /find
    ↓
 7. Loading / 404 / error states handled client-side
 ```
 
-## Data Flow: Owner Booking Requests
+## Data Flow: Owner Booking Requests (Host Mode)
 
 ```
-1. Space owner loads /dashboard
+1. User loads /host
    ↓
 2. GET /api/bookings/mine
    Headers: Authorization: Bearer <token>
    ↓
-3. Backend: require_space_owner → list_bookings_for_owner(user.id)
+3. Backend: list_bookings_for_owner(user.id)
    - Joins booking → space (filter owner_id) → personal_account (borrower name)
    ↓
-4. Dashboard renders three columns: Pending Approval, Confirmed, Rejected
+4. BookingGroups renders three columns: Pending Approval, Confirmed, Rejected
    - Pending rows: inline Accept / Reject (PATCH approve|reject)
    - All rows link to /bookings/{id}
    ↓
-5. Booking detail page shows space, borrower, dates, exchange_offer, status
+5. Booking detail page shows space, borrower, dates, exchange_offer, contract, status
    - Pending bookings: Accept / Reject at bottom
+   - Approved: sign contract; completed: rate
 ```
 
 ## Frontend Design System (Match for Space)
@@ -501,12 +610,24 @@ The UI is branded **Match for Space** with a purple-and-white aesthetic.
 
 - `LogoMark` — purple circle logo with house and sparkle
 - `PasswordInput` — password field with visibility toggle
+- `AppShell` — page shell with header, ModeNav, and back links
+- `ModeNav` — Find | My spaces toggle in header
+- `BookingGroups` — three-column booking request layout (pending / confirmed / rejected)
 
 **Key routes:**
 
 - `/` — landing splash (login / join us buttons); redirects to dashboard if logged in
 - `/login` — "Wow you're back!" login screen
-- `/register` — "Nice to meet you!" registration screen
+- `/register` — "Nice to meet you!" registration screen (terms/privacy acceptance)
+- `/register/verified` — post-registration confirmation screen
+- `/dashboard` — home hub (choose Find a space or My spaces)
+- `/find` — search, filters, my booking requests (own listings excluded from search)
+- `/host` — my listings, incoming requests, add a space
+- `/spaces` — redirects to `/find`
+- `/spaces/new` — create listing form
+- `/spaces/[id]` — space detail + Book Now
+- `/bookings/[id]` — booking detail, approve/reject, contract signing, ratings
+- `/messages` — chat conversations (WebSocket per booking)
 
 ## External Dependencies
 
@@ -526,7 +647,8 @@ The UI is branded **Match for Space** with a purple-and-white aesthetic.
 | Token invalid | Tampered or corrupt | Reject and redirect to /login |
 | Backend unreachable | Service down | Show "Network error. Try again" |
 | Invalid form input | Client-side validation | Show field-level error message |
-| Not space owner | Wrong account type on protected endpoint | 403 or redirect to dashboard |
+| Not space owner | Legacy check on some endpoints | 403 or redirect |
+| Own listing in Find | Authenticated search excludes owner_id | Hidden from /find results |
 | Space validation failed | Missing/invalid listing fields | 400 with detail message |
 | Space not found | Invalid or deleted space id | 404 on detail page |
 
@@ -592,6 +714,7 @@ space
 ├─ location
 ├─ description
 ├─ rules
+├─ exchange_preferences
 └─ created_at
 
 booking
@@ -600,8 +723,12 @@ booking
 ├─ borrower_id (FK) ────→ personal_account.id
 ├─ start_date
 ├─ end_date
-├─ status (pending | approved | rejected)
+├─ status (pending | approved | rejected | completed)
 ├─ exchange_offer (Text, nullable)
+├─ intended_use (Text, nullable)
+├─ contract_text (Text, nullable)
+├─ borrower_signed_at
+├─ owner_signed_at
 └─ created_at
 
 space_photo
@@ -609,6 +736,26 @@ space_photo
 ├─ space_id (FK) ────→ space.id
 ├─ image_url
 ├─ position
+└─ created_at
+
+conversation
+├─ id (PK)
+├─ booking_id (FK) ────→ booking.booking_id
+└─ created_at
+
+message
+├─ id (PK)
+├─ conversation_id (FK)
+├─ sender_id (FK) ────→ users.id
+├─ content (Text)
+└─ created_at
+
+rating
+├─ id (PK)
+├─ booking_id (FK)
+├─ rater_id (FK) ────→ users.id
+├─ score (1–5)
+├─ comment (Text, nullable)
 └─ created_at
 ```
 
@@ -669,40 +816,34 @@ Community Space Sharing Platform - Excel Import
 
 → see DECISIONS.md #12, #13, #14, and #15 for the "why" behind this approach
 
-## Current Phase: Listings, Bookings, and UI
+## Current Phase: Full Flowchart MVP
 
 **Implemented:**
 - **Match for Space UI** — purple (`#a166ff`), IBM Plex Sans, landing splash, redesigned login/register
-- Space owners can create listings via `POST /api/spaces` and `/spaces/new`
-- Owner dashboard: listings (linked to detail) + booking requests in three columns (pending, confirmed, rejected)
-- Owner can approve/reject pending bookings from dashboard or `/bookings/{id}`
-- Booking responses include `exchange_offer` (what the borrower offers in exchange)
-- Minimal public space detail page at `/spaces/[id]`
-- Bookings API: `GET /api/bookings/mine`, `GET /api/bookings/{id}`, `PATCH approve|reject`
-- Demo seed data (`seed_data.py`) with mixed booking statuses and `demoowner` / `secret12` login
-- SQLite migration for `exchange_offer` column on startup (`database.py`)
-- Backend tests for auth, spaces, and bookings (58 tests)
+- **Find/Host mode split** — `/dashboard` hub, `/find` (search + my requests), `/host` (listings + incoming requests), `ModeNav` + `AppShell`
+- **Space discovery** — filterable `GET /api/spaces`; optional auth excludes own listings when browsing as logged-in user
+- **Listings** — create via `/spaces/new`, photo upload (`POST /api/spaces/{id}/photos`), `exchange_preferences` field
+- **Borrower booking** — Book Now on detail page, `POST /api/bookings`, my requests on `/find`
+- **Owner workflow** — approve/reject, contract signing, ratings on `/bookings/{id}` and `/host`
+- **Chat** — `/messages`, WebSocket `/api/chat/ws/{booking_id}`, conversation persistence
+- **Registration** — terms/privacy acceptance, linked `PersonalAccount`/`BusinessAccount`, `/register/verified`
+- **Demo seed** — Milan spaces (owner1 / `demoowner`), 4 Bolzano spaces (owner2), mixed booking statuses
+- Backend tests for auth, spaces, bookings, and chat (61+ tests)
 
 **Not yet implemented:**
-- `POST /api/bookings` (borrower booking request form)
-- Photo upload / `space_photo` creation from the UI
 - Availability calendar widget (text field only for now)
-- Photo gallery and Book Now flow on detail page
-- Public search/filter UI
-- User dashboard booking sections, chat, messages
+- Saved spaces / favourites
+- Email verification (UI flow only)
+- Production deployment (PostgreSQL, HTTPS, refresh tokens)
 
 ## Next Phases
 
-### Phase 2: Space Discovery (remaining)
-- Space search/filter UI and proximity ordering
-- Full detail page (photo gallery, calendar, Book Now)
-- User dashboard sections (bookings, saved spaces)
+### Phase 2: Polish & Discovery
+- Availability calendar widget on listing and detail pages
+- Saved spaces / favourites
+- Proximity-based search ordering
 
-### Phase 3: Booking (borrower side) & Chat
-- Booking request form for users (`POST /api/bookings`)
-- Real-time chat (WebSocket or polling)
-
-### Phase 4: Production Deployment
+### Phase 3: Production Deployment
 - Switch to httpOnly cookies instead of localStorage
 - Add refresh tokens
 - Move SECRET_KEY to environment variable

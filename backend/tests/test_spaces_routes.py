@@ -41,6 +41,57 @@ class TestListSpaces:
         assert len(spaces) == 1
         assert spaces[0]["name"] == "New Loft"
 
+    def test_list_spaces_excludes_own_when_authenticated(self, client, space_owner_token):
+        create_response = client.post(
+            "/api/spaces",
+            json=valid_space_payload(name="My Loft"),
+            headers=auth_headers(space_owner_token),
+        )
+        assert create_response.status_code == 201
+        space_id = create_response.json()["id"]
+
+        auth_response = client.get(
+            "/api/spaces",
+            headers=auth_headers(space_owner_token),
+        )
+        assert auth_response.status_code == 200
+        auth_names = [s["name"] for s in auth_response.json()]
+        assert "My Loft" not in auth_names
+
+        public_response = client.get("/api/spaces")
+        assert public_response.status_code == 200
+        public_ids = [s["id"] for s in public_response.json()]
+        assert space_id in public_ids
+
+    def test_list_spaces_includes_other_owners(self, client, space_owner_token):
+        register_user(
+            client,
+            username="otherhost",
+            email="otherhost@example.com",
+            password="secret12",
+            account_type="user",
+        )
+        other_token = login_user(client, "otherhost", "secret12").json()["token"]
+
+        client.post(
+            "/api/spaces",
+            json=valid_space_payload(name="Other Host Loft", location="Bolzano"),
+            headers=auth_headers(other_token),
+        )
+        client.post(
+            "/api/spaces",
+            json=valid_space_payload(name="Owner Loft"),
+            headers=auth_headers(space_owner_token),
+        )
+
+        response = client.get(
+            "/api/spaces",
+            headers=auth_headers(space_owner_token),
+        )
+        names = [s["name"] for s in response.json()]
+        assert "Other Host Loft" in names
+        assert "Owner Loft" not in names
+
 
 class TestListMySpaces:
     def test_list_my_spaces_empty(self, client, space_owner_token):

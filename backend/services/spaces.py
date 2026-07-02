@@ -109,9 +109,12 @@ def search_spaces(
     max_area: Optional[float] = None,
     location: Optional[str] = None,
     availability: Optional[str] = None,
+    exclude_owner_id: Optional[str] = None,
 ) -> List[dict]:
     query = db.query(Space)
 
+    if exclude_owner_id:
+        query = query.filter(Space.owner_id != exclude_owner_id)
     if category:
         query = query.filter(Space.category.ilike(f"%{category}%"))
     if is_outdoor is not None:

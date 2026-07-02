@@ -1,6 +1,6 @@
 # Match for Space
 
-**What it does:** A web app where people can share and discover underused spaces in their community. Space owners list spaces, review booking requests, and approve or reject them. Users can browse spaces and (in a future phase) submit booking requests.
+**What it does:** A web app where people can share and discover underused spaces in their community. Space owners list spaces, review booking requests, and approve or reject them. Users browse spaces in **Find** mode, submit booking requests, sign contracts, chat with owners, and leave ratings.
 
 **Current phase:** Full flowchart MVP — search, booking, owner approval, contracts, chat, ratings, and Match for Space UI.
 
@@ -63,7 +63,7 @@ chmod +x start.sh stop.sh  # Make scripts executable (first time only)
 2. **Register:** Click **join us!**, fill in the form, select account type
 3. **Log in:** Use your credentials (or seed user `demoowner` / `secret12` after running `python3 seed_data.py` in `backend/`)
 4. **Home hub:** After login you land on `/dashboard` — choose **Find a space** or **My spaces**
-5. **Find mode (`/find`):** Browse spaces, filter, book — track requests under "My booking requests"
+5. **Find mode (`/find`):** Browse spaces in Bolzano (and elsewhere) — your own listings are hidden here; filter and book
 6. **Host mode (`/host`):** Manage listings, review incoming requests, add new spaces
 7. **Book → approve → sign → chat:** Book from a space detail page; owner approves on `/host`; both sign on booking detail; chat at `/messages`
 
@@ -72,7 +72,7 @@ chmod +x start.sh stop.sh  # Make scripts executable (first time only)
 cd backend
 python3 seed_data.py
 ```
-Then log in as `demoowner` / `secret12` to see sample spaces and bookings.
+Then log in as `demoowner` / `secret12` to see sample spaces and bookings. Find mode shows Bolzano spaces from other owners (not your own listings).
 
 ### 5. Stop the system
 
@@ -89,6 +89,10 @@ When done, press `Ctrl + C` in Terminal, or in a new Terminal window run:
 | What | URL | Purpose |
 |------|-----|---------|
 | App | http://localhost:3000 | The web interface |
+| Home hub | http://localhost:3000/dashboard | Choose Find a space or My spaces |
+| Find mode | http://localhost:3000/find | Browse and book spaces (own listings hidden) |
+| Host mode | http://localhost:3000/host | Manage listings and incoming requests |
+| Messages | http://localhost:3000/messages | Chat with booking partners |
 | API | http://localhost:8000 | Backend server |
 | API Docs | http://localhost:8000/docs | Interactive API documentation (Swagger) |
 
@@ -99,8 +103,8 @@ When done, press `Ctrl + C` in Terminal, or in a new Terminal window run:
 See `STRUCTURE.md` for the complete file tree and explanations.
 
 **Quick reference:**
-- `frontend/` — web pages, login, dashboard (Next.js + React)
-- `backend/` — HTTP API and database logic (FastAPI + SQLite)
+- `frontend/` — web pages, Find/Host modes, chat (Next.js + React)
+- `backend/` — HTTP API, WebSocket chat, database logic (FastAPI + SQLite)
 - `docker-compose.yml` — how services are started
 - `DECISIONS.md` — why we built it this way
 - `ARCHITECTURE.md` — system diagram and data flow
@@ -150,6 +154,7 @@ Do not run `npm run build` while `npm run dev` is running.
 **Where should I look to understand...?**
 
 - **How login works?** → `ARCHITECTURE.md` (Data Flow section) + `frontend/src/lib/auth.tsx`
+- **Find vs Host modes?** → `ARCHITECTURE.md` (Home Hub and Find/Host Modes) + `frontend/src/components/ModeNav.tsx`
 - **Where user data is stored?** → `backend/models.py` (User table definition)
 - **How passwords are secured?** → `backend/services/auth.py` (bcrypt hashing)
 - **What files are where?** → `STRUCTURE.md` (complete file tree)
@@ -211,21 +216,20 @@ See `ARCHITECTURE.md` (Frontend Design System section) for details.
 
 ## Next Steps: What to Build Next
 
-### Phase 2: Space Discovery
-- Public search and filter UI for spaces
-- Full space detail page (photo gallery, availability calendar, Book Now)
+The core flowchart MVP is implemented (search, booking, contracts, chat, ratings, Find/Host split). Remaining work:
 
-### Phase 3: Borrower Booking & Chat
-- Booking request form for users (`POST /api/bookings`)
-- User dashboard (upcoming bookings, pending requests)
-- Real-time chat between owners and borrowers
+### Polish
+- Availability calendar widget (currently a text field)
+- Saved spaces / favourites
+- Proximity-based search ordering
 
-### Phase 4: Production
+### Production
 - Switch from SQLite to PostgreSQL
 - Use proper HTTPS (not http://localhost)
 - Deploy to a server (Heroku, DigitalOcean, AWS, etc.)
 - Change SECRET_KEY to a real random value
 - Update CORS allowed origins
+- Refresh tokens and httpOnly cookies
 
 ---
 
