@@ -8,23 +8,27 @@ thirdspaces/
 │   ├── main.py                     — entry point, starts the server, registers routes
 │   ├── config.py                   — all configuration (ports, paths, keys)
 │   ├── models.py                   — database schema (users + 5 Excel tables)
-│   ├── database.py                 — SQLite connection and session management
+│   ├── database.py                 — SQLite connection, schema migration on startup
 │   ├── dependencies.py             — shared auth: get_current_user, require_space_owner
 │   ├── import_excel.py             — script to import data from database edt.xlsx
-│   ├── seed_data.py                — demo seed data (English, includes description/rules)
+│   ├── seed_data.py                — demo seed (spaces, bookings, demoowner login)
 │   ├── routes/
 │   │   ├── auth.py                 — API endpoints: /api/auth/* (register, login, me, logout)
-│   │   └── spaces.py               — API endpoints: /api/spaces/* (create, list, mine, detail)
+│   │   ├── spaces.py               — API endpoints: /api/spaces/* (create, list, mine, detail)
+│   │   └── bookings.py             — API endpoints: /api/bookings/* (mine, detail, approve, reject)
 │   ├── services/
 │   │   ├── auth.py                 — business logic (password hashing, token generation)
-│   │   └── spaces.py               — business logic (create_space, list_spaces_by_owner)
+│   │   ├── spaces.py               — business logic (create_space, list_spaces_by_owner)
+│   │   └── bookings.py             — business logic (list/get/update owner bookings)
 │   ├── tests/
 │   │   ├── conftest.py             — pytest fixtures (in-memory DB, test client, auth tokens)
 │   │   ├── test_health.py          — health endpoint tests
 │   │   ├── test_auth_service.py    — unit tests for auth service
 │   │   ├── test_auth_routes.py     — API tests for auth routes
 │   │   ├── test_spaces_service.py  — unit tests for spaces service
-│   │   └── test_spaces_routes.py   — API tests for spaces routes
+│   │   ├── test_spaces_routes.py   — API tests for spaces routes
+│   │   ├── test_bookings_service.py — unit tests for bookings service
+│   │   └── test_bookings_routes.py — API tests for bookings routes
 │   ├── pytest.ini                  — pytest configuration
 │   ├── requirements.txt            — Python dependencies (FastAPI, SQLAlchemy, pandas, etc.)
 │   ├── requirements-dev.txt        — dev dependencies (pytest, httpx)
@@ -35,22 +39,30 @@ thirdspaces/
 ├── frontend/                        — Next.js web app (TypeScript/React)
 │   ├── src/
 │   │   ├── app/
-│   │   │   ├── layout.tsx           — root layout, wraps app with AuthProvider
-│   │   │   ├── page.tsx             — home page, redirects based on auth status
+│   │   │   ├── layout.tsx           — root layout, IBM Plex Sans, AuthProvider
+│   │   │   ├── page.tsx             — landing splash (login / join us)
 │   │   │   ├── login/
-│   │   │   │   └── page.tsx         — login form
+│   │   │   │   └── page.tsx         — login form (Match for Space design)
 │   │   │   ├── register/
 │   │   │   │   └── page.tsx         — registration form
 │   │   │   ├── dashboard/
-│   │   │   │   └── page.tsx         — protected dashboard (role-based content)
+│   │   │   │   └── page.tsx         — protected dashboard (listings + booking columns)
+│   │   │   ├── bookings/
+│   │   │   │   └── [id]/
+│   │   │   │       └── page.tsx     — booking detail (approve/reject)
 │   │   │   ├── spaces/
+│   │   │   │   ├── [id]/
+│   │   │   │   │   └── page.tsx     — public space detail
 │   │   │   │   └── new/
 │   │   │   │       └── page.tsx     — list-a-space form (space_owner only)
-│   │   │   └── globals.css          — global styles (Tailwind, custom components)
+│   │   │   └── globals.css          — global styles (Tailwind, .btn, .input, .card)
 │   │   ├── components/
-│   │   │   └── ProtectedRoute.tsx   — wrapper for authenticated pages
+│   │   │   ├── ProtectedRoute.tsx   — wrapper for authenticated pages
+│   │   │   ├── LogoMark.tsx         — purple circle logo (house + sparkle)
+│   │   │   └── PasswordInput.tsx    — password field with visibility toggle
 │   │   └── lib/
-│   │       └── auth.tsx             — React Context for authentication state
+│   │       ├── auth.tsx             — React Context for authentication state
+│   │       └── bookings.ts          — booking types, date/status helpers
 │   ├── package.json                 — Node dependencies (Next.js, Tailwind, shadcn/ui)
 │   ├── tsconfig.json                — TypeScript configuration
 │   ├── tailwind.config.js           — Tailwind CSS customization
@@ -81,7 +93,7 @@ thirdspaces/
 
 **main.py**
 - Entry point for the FastAPI server
-- Imports and registers auth and spaces routes
+- Imports and registers auth, spaces, and bookings routes
 - Sets up CORS for frontend communication
 
 **config.py**
@@ -92,11 +104,13 @@ thirdspaces/
 - Database schema definitions using SQLAlchemy ORM
 - Tables: `users` (JWT auth), `personal_account`, `business_account`, `spaces`, `booking`, `space_photo`
 - `spaces` includes `description` and `rules` (Text, nullable) for listing details
+- `booking` includes `exchange_offer` (Text, nullable) for what the borrower offers in exchange
 
 **database.py**
 - Manages SQLite connection
 - Provides `get_db()` dependency for FastAPI routes
-- Automatically creates tables on startup
+- Creates tables on startup
+- Runs lightweight migrations (e.g. adds `exchange_offer` to `booking` if missing)
 
 **dependencies.py**
 - Shared FastAPI auth dependencies used across routes
@@ -116,6 +130,19 @@ thirdspaces/
 - `GET /api/spaces/mine` — owner's listings, id/name/location only (space_owner + JWT)
 - `GET /api/spaces` — public list of all spaces
 - `GET /api/spaces/{id}` — public space detail
+
+**routes/bookings.py**
+- HTTP endpoints for space owner booking management
+- `GET /api/bookings/mine` — all bookings for owner's spaces (space_owner + JWT)
+- `GET /api/bookings/{id}` — single booking detail
+- `PATCH /api/bookings/{id}/approve` — approve pending booking
+- `PATCH /api/bookings/{id}/reject` — reject pending booking
+
+**services/bookings.py**
+- Business logic for owner booking requests
+- `list_bookings_for_owner()` — joins booking, space, personal_account
+- `get_booking_for_owner()` — single booking with authorization check
+- `update_booking_status()` — pending → approved | rejected only
 
 **services/auth.py**
 - Business logic for authentication
@@ -145,46 +172,63 @@ thirdspaces/
 
 **seed_data.py**
 - Standalone script to populate demo data in English
-- Clears and re-seeds business accounts, spaces (with description/rules), bookings
+- Clears and re-seeds business accounts, spaces, bookings (pending/approved/rejected), exchange_offer text
+- Creates demo login `demoowner` / `secret12` (User.id matches owner1 business account)
 - Usage: `python3 seed_data.py`
-- Note: `owner_id` in seed data references `business_account` IDs (import path); app-created listings use `users.id`
 
 **tests/**
 - Pytest suite run from `backend/` with `pytest`
 - Uses in-memory SQLite and dependency overrides (see `conftest.py`)
-- Covers auth and spaces routes/services
+- Covers auth, spaces, and bookings routes/services (58 tests)
 
 ### Frontend Files
 
 **src/app/layout.tsx**
 - Root layout component
-- Wraps entire app with `AuthProvider` to enable global auth state
-- Imports and applies global CSS
+- Loads IBM Plex Sans via `next/font/google`
+- Wraps entire app with `AuthProvider`
+- App title: Match for Space
 
-**src/lib/auth.tsx**
-- React Context for authentication state management
-- `AuthProvider` component manages login state and token persistence
-- `useAuth()` hook provides: user, login(), register(), logout(), loading, error
-- Stores JWT token in localStorage (see DECISIONS.md #5)
+**src/lib/bookings.ts**
+- TypeScript types for owner booking API responses
+- Helpers: `statusLabel`, `formatDate`, `formatDateRange`, `exchangeOfferPreview`
+
+**src/components/LogoMark.tsx**
+- SVG logo: purple circle with white house outline and sparkle
+
+**src/components/PasswordInput.tsx**
+- Password input with visibility toggle and `SparkleIcon` helper
 
 **src/app/login/page.tsx**
-- Login form page
-- Takes username and password
+- Login page ("Wow you're back!" — Match for Space design)
+- Username + `PasswordInput`, forgot-password link (UI only)
 - On success: redirects to /dashboard
-- On failure: shows error and prompts to create account
 
 **src/app/register/page.tsx**
-- Registration form page
-- Collects: username, email, password, account type selection
-- Client-side validation with field-level error messages
+- Registration page ("Nice to meet you!")
+- Account type, username, email, passwords via `PasswordInput`
 - On success: automatically logs in and redirects to dashboard
 
 **src/app/dashboard/page.tsx**
 - Protected route (requires authentication)
-- Shows different content based on `account_type`
-- Space owners: **List a Space** button, **Your Listings** (name + location via `GET /api/spaces/mine`)
+- Header with `LogoMark` and Match for Space branding
+- Space owners: **List a Space**, **Your Listings** (links to `/spaces/{id}`)
+- **Booking Requests** in three columns: Pending Approval, Confirmed, Rejected
+- Pending bookings: inline Accept/Reject; all rows link to `/bookings/{id}`
 - Regular users: placeholder sections for bookings, saved spaces, messages
-- Has logout button
+
+**src/app/bookings/[id]/page.tsx**
+- Protected route for space owners only
+- Fetches booking via `GET /api/bookings/{id}`
+- Shows space, borrower, dates, exchange_offer, status
+- Accept/Reject buttons for pending bookings
+
+**src/app/spaces/[id]/page.tsx**
+- Public route (no ProtectedRoute)
+- Fetches space via `GET /api/spaces/{id}`
+- Displays name, location, description, rules with empty-state fallbacks
+- Handles loading, 404, and error states
+- Link back to `/dashboard`
 
 **src/app/spaces/new/page.tsx**
 - Protected route for space owners only
@@ -200,29 +244,24 @@ thirdspaces/
 - Shows loading state while checking
 
 **src/app/page.tsx**
-- Home page (/)
-- Automatically redirects based on auth status:
-  - If logged in: → /dashboard
-  - If not: → /login
+- Landing splash (/)
+- Shows logo, **Match for Space** title, **login** and **join us!** buttons
+- If logged in: redirects to `/dashboard`
+
+**src/lib/auth.tsx**
+- React Context for authentication state management
+- `AuthProvider` component manages login state and token persistence
+- `useAuth()` hook provides: user, login(), register(), logout(), loading, error
+- Stores JWT token in localStorage (see DECISIONS.md #5)
 
 **globals.css**
 - Tailwind CSS imports
-- Custom component styles (.card, .btn, .input)
-- Base and component layers
-
-### Configuration Files
-
-**package.json**
-- Lists all Node.js dependencies
-- Defines npm scripts: `npm run dev`, `npm run build`, `npm start`
-
-**next.config.js**
-- Next.js configuration
-- Sets NEXT_PUBLIC_API_URL environment variable for API communication
+- Shared design system: `.card`, `.btn-primary`, `.btn-outline`, `.btn-secondary`, `.input`
+- Primary color `#a166ff` via Tailwind `primary` token
 
 **tailwind.config.js**
 - Tailwind CSS customization
-- Defines color palette for community-friendly aesthetic
+- Match for Space palette: `primary` (#a166ff), `primary-dark`, `primary-light`
 
 **tsconfig.json**
 - TypeScript compiler configuration
@@ -281,7 +320,8 @@ thirdspaces/
 **ARCHITECTURE.md**
 - ASCII diagram showing how components connect
 - Explanation of tech stack choices
-- Data flow walkthrough (auth, create listing, owner listings)
+- Data flow walkthrough (auth, listings, space detail, owner bookings)
+- Frontend design system (Match for Space)
 - Component list with how each runs
 
 **STRUCTURE.md**
@@ -306,18 +346,18 @@ thirdspaces/
 
 ## Data Flow: Authentication
 
-1. User visits http://localhost:3000
-2. **src/app/page.tsx** checks `useAuth()` → if not logged in, redirects to /login
-3. User enters username/password on **src/app/login/page.tsx**
-4. Frontend calls `POST http://localhost:8000/api/auth/login` (via useAuth)
+1. User visits http://localhost:3000 → landing splash (**src/app/page.tsx**)
+2. If logged in → redirect to `/dashboard`; otherwise show **login** / **join us!** buttons
+3. User opens **/login** or **/register** and submits credentials
+4. Frontend calls `POST /api/auth/login` or `POST /api/auth/register` (via useAuth)
 5. Backend **routes/auth.py** receives request
 6. **services/auth.py** validates credentials against **models.py** (users table in SQLite)
 7. If valid: **services/auth.py** creates JWT token using **config.py** SECRET_KEY
 8. Backend returns token + user info to frontend
 9. Frontend stores token in localStorage (via AuthProvider in **src/lib/auth.tsx**)
 10. Frontend redirects to **/dashboard**
-11. **src/app/dashboard/page.tsx** (wrapped in ProtectedRoute) displays user info
-12. User can log out → clears token → redirects to /login
+11. **src/app/dashboard/page.tsx** (wrapped in ProtectedRoute) displays user info and owner tools
+12. User can log out → clears token → can return to landing or login
 
 ## Data Flow: Space Listings (Space Owner)
 
@@ -326,19 +366,38 @@ thirdspaces/
 3. **dependencies.py** → `require_space_owner` → **services/spaces.py** → `create_space()`
 4. New row in `spaces` table (`owner_id` = `users.id`)
 5. Redirect to dashboard
-6. Dashboard calls `GET /api/spaces/mine` → renders **Your Listings** (name + location)
+6. Dashboard calls `GET /api/spaces/mine` → renders **Your Listings** (name + location, each linking to `/spaces/{id}`)
+
+## Data Flow: Space Detail Page
+
+1. User clicks listing on dashboard or opens `/spaces/{id}` directly
+2. **src/app/spaces/[id]/page.tsx** reads id from URL
+3. `GET /api/spaces/{id}` (no auth) → **routes/spaces.py**
+4. Page renders name, location, description, rules (or loading / 404 / error)
+
+## Data Flow: Owner Booking Requests
+
+1. Space owner dashboard calls `GET /api/bookings/mine` with Bearer token
+2. **routes/bookings.py** → **services/bookings.py** → joins booking, space, personal_account
+3. Dashboard renders three columns: Pending Approval, Confirmed, Rejected
+4. Owner clicks Accept/Reject on pending row → `PATCH /api/bookings/{id}/approve|reject`
+5. Owner opens `/bookings/{id}` for full detail including `exchange_offer`
 
 ## Current Phase
 
 **Implemented:**
+- **Match for Space UI** — purple `#a166ff`, IBM Plex Sans, landing splash, redesigned login/register
 - Authentication (login, register, dashboard)
 - Create space listing (`/spaces/new`, `POST /api/spaces`)
-- Owner listings on dashboard (`GET /api/spaces/mine`)
-- Public space list/detail API (`GET /api/spaces`, `GET /api/spaces/{id}`)
-- Backend tests for auth and spaces
+- Owner listings on dashboard with links to `/spaces/{id}`
+- Minimal space detail page (`/spaces/[id]`)
+- Owner booking management: list, detail, approve/reject (`/api/bookings/*`)
+- Booking `exchange_offer` field (what borrower offers in exchange)
+- Demo seed data with `demoowner` / `secret12`
+- Backend tests for auth, spaces, and bookings (58 tests)
 
 **Next:**
+- Borrower booking request form (`POST /api/bookings`)
 - Space search UI and filters
-- Space detail page with photo gallery
-- Booking flow, chat, availability calendar
-- Photo upload on listing create
+- Full detail page (photo gallery, calendar, Book Now)
+- Chat, user dashboard sections, photo upload

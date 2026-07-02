@@ -18,6 +18,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routes.auth import router as auth_router
 from routes.spaces import router as spaces_router
+from routes.bookings import router as bookings_router
 import config
 
 # Create FastAPI application
@@ -50,6 +51,13 @@ app.include_router(auth_router)
 # GET /api/spaces/mine - list current owner's spaces
 # GET /api/spaces/{id} - get space details
 app.include_router(spaces_router)
+
+# Include bookings routes
+# GET /api/bookings/mine - list bookings for owner's spaces
+# GET /api/bookings/{id} - booking detail
+# PATCH /api/bookings/{id}/approve - approve pending booking
+# PATCH /api/bookings/{id}/reject - reject pending booking
+app.include_router(bookings_router)
 
 @app.get("/")
 def root():

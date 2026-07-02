@@ -1,8 +1,8 @@
-# Community Space Sharing Platform
+# Match for Space
 
-**What it does:** A web app where people can share and discover underused spaces in their community. Users can browse spaces, request bookings, and owners can approve them. Includes real-time chat and availability calendars.
+**What it does:** A web app where people can share and discover underused spaces in their community. Space owners list spaces, review booking requests, and approve or reject them. Users can browse spaces and (in a future phase) submit booking requests.
 
-**Current phase:** Authentication only (login, registration, dashboard). Implement features one phase at a time.
+**Current phase:** Authentication, space listings, owner booking management, and Match for Space UI. Chat, public search, and borrower booking forms are not yet built.
 
 ---
 
@@ -59,10 +59,18 @@ chmod +x start.sh stop.sh  # Make scripts executable (first time only)
 
 ### 4. Test the app
 
-1. **Register:** Go to "Create one" link, fill in the form, select account type
-2. **Log in:** Use your new credentials
-3. **Dashboard:** See your user info and account type
-4. **Log out:** Click the Log Out button
+1. **Landing:** Open http://localhost:3000 — splash screen with **login** and **join us!**
+2. **Register:** Click **join us!**, fill in the form, select account type
+3. **Log in:** Use your credentials (or seed user `demoowner` / `secret12` after running `python3 seed_data.py` in `backend/`)
+4. **Dashboard:** Space owners see listings and booking requests in three columns (Pending, Confirmed, Rejected)
+5. **Log out:** Click the Log Out button
+
+**Demo data (optional):**
+```bash
+cd backend
+python3 seed_data.py
+```
+Then log in as `demoowner` / `secret12` to see sample spaces and bookings.
 
 ### 5. Stop the system
 
@@ -119,12 +127,13 @@ docker-compose logs backend  # Any error messages?
 ```
 
 ### Issue: "Cannot find module" error in frontend
-**Fix:** Dependencies weren't installed in the container. Rebuild:
+**Fix:** Stale Next.js build cache. Stop the dev server, then:
 ```bash
-docker-compose down
-docker-compose build --no-cache
-./start.sh
+cd frontend
+rm -rf .next node_modules/.cache
+npm run dev
 ```
+Do not run `npm run build` while `npm run dev` is running.
 
 ### Issue: Login always fails
 **Fix:** 
@@ -170,6 +179,23 @@ npm run dev
 
 **Database:** Created automatically in `backend/app.db`
 
+**Backend tests:**
+```bash
+cd backend
+pytest
+```
+
+### UI and branding
+
+The frontend is branded **Match for Space**:
+
+- Primary color: `#a166ff`
+- Font: IBM Plex Sans (via `next/font/google`)
+- Design tokens and shared classes: `frontend/tailwind.config.js`, `frontend/src/app/globals.css`
+- Landing splash at `/`, redesigned `/login` and `/register`
+
+See `ARCHITECTURE.md` (Frontend Design System section) for details.
+
 ### Stopping development servers
 - Backend: Press `Ctrl + C` in the backend terminal
 - Frontend: Press `Ctrl + C` in the frontend terminal
@@ -184,21 +210,15 @@ npm run dev
 ## Next Steps: What to Build Next
 
 ### Phase 2: Space Discovery
-- Add ability for owners to list their spaces
-- Add page to search and filter spaces
-- Show space details (photos, rules, availability calendar)
+- Public search and filter UI for spaces
+- Full space detail page (photo gallery, availability calendar, Book Now)
 
-### Phase 3: Booking
-- Add booking request form
-- Owners can approve/reject requests
-- Real-time notifications
+### Phase 3: Borrower Booking & Chat
+- Booking request form for users (`POST /api/bookings`)
+- User dashboard (upcoming bookings, pending requests)
+- Real-time chat between owners and borrowers
 
-### Phase 4: Chat
-- Private messaging between users and owners
-- File/image sharing
-- Booking reference integration
-
-### Production
+### Phase 4: Production
 - Switch from SQLite to PostgreSQL
 - Use proper HTTPS (not http://localhost)
 - Deploy to a server (Heroku, DigitalOcean, AWS, etc.)

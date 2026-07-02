@@ -61,7 +61,7 @@ export default function SpaceDetailPage() {
   }, [id])
 
   return (
-    <div className="min-h-screen bg-light">
+    <div className="min-h-screen bg-white">
       <main className="max-w-2xl mx-auto px-4 py-8">
         <div className="mb-6">
           <Link href="/dashboard" className="font-medium text-primary hover:underline">

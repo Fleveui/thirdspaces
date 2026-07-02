@@ -4,7 +4,8 @@
 
 from datetime import datetime, timedelta
 from database import SessionLocal
-from models import Space, Booking, BusinessAccount, PersonalAccount, SpacePhoto
+from models import Space, Booking, BusinessAccount, PersonalAccount, SpacePhoto, User, AccountType
+from services.auth import hash_password
 import uuid
 
 def seed_database():
@@ -45,6 +46,23 @@ def seed_database():
         db.add(owner2)
         db.commit()
         print("✅ Created 2 business accounts")
+
+        existing_demo_user = db.query(User).filter(User.username == "demoowner").first()
+        if existing_demo_user:
+            db.delete(existing_demo_user)
+            db.commit()
+
+        demo_user = User(
+            id=owner1_id,
+            username="demoowner",
+            email="demoowner@example.com",
+            password_hash=hash_password("secret12"),
+            account_type=AccountType.SPACE_OWNER,
+            created_at=datetime.utcnow(),
+        )
+        db.add(demo_user)
+        db.commit()
+        print("✅ Created demo space owner login (demoowner / secret12)")
         
         # Create demo spaces
         spaces_data = [
@@ -136,21 +154,30 @@ def seed_database():
         db.commit()
         print("✅ Created 1 personal account (borrower)")
         
-        # Create demo bookings
-        for i, space in enumerate(created_spaces[:3]):
+        # Create demo bookings on owner1 spaces with mixed statuses
+        owner1_spaces = [space for space in created_spaces if space.owner_id == owner1_id]
+        booking_statuses = ["pending", "approved", "rejected"]
+        exchange_offers = [
+            "I will host a free community workshop for local residents on sustainable gardening.",
+            "Professional photo coverage and social media promotion for your space.",
+            "Weekly garden maintenance and composting support for three months.",
+        ]
+
+        for i, space in enumerate(owner1_spaces[:3]):
             booking = Booking(
                 booking_id=str(uuid.uuid4().hex),
                 space_id=space.id,
                 borrower_id=borrower.id,
-                start_date=datetime.utcnow() + timedelta(days=7+i),
-                end_date=datetime.utcnow() + timedelta(days=14+i),
-                status="pending",
-                created_at=datetime.utcnow()
+                start_date=datetime.utcnow() + timedelta(days=7 + i),
+                end_date=datetime.utcnow() + timedelta(days=14 + i),
+                status=booking_statuses[i],
+                exchange_offer=exchange_offers[i],
+                created_at=datetime.utcnow(),
             )
             db.add(booking)
-        
+
         db.commit()
-        print("✅ Created 3 demo bookings")
+        print("✅ Created 3 demo bookings (pending, approved, rejected)")
         
         print("\n" + "="*60)
         print("✅ Database seeding completed!")

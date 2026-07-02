@@ -12,12 +12,16 @@
 ┌──────────────────────────────────────────────────────────────┐
 │          Frontend (Next.js)                                   │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐        │
-│  │  Login Page  │  │ Register Pg  │  │ Dashboard    │        │
-│  │  /login      │  │ /register    │  │ /dashboard   │        │
+│  │  Landing     │  │  Login Page  │  │ Register Pg  │        │
+│  │  /           │  │  /login      │  │ /register    │        │
+│  └──────────────┘  └──────────────┘  └──────────────┘        │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐        │
+│  │  Dashboard   │  │ List Space   │  │ Space Detail │        │
+│  │  /dashboard  │  │ /spaces/new  │  │ /spaces/[id] │        │
 │  └──────────────┘  └──────────────┘  └──────────────┘        │
 │  ┌──────────────┐                                            │
-│  │ List Space   │  (space_owner only)                         │
-│  │ /spaces/new  │                                            │
+│  │ Booking Dtl  │  (space_owner only)                         │
+│  │ /bookings/id │                                            │
 │  └──────────────┘                                            │
 │         │                 │                   │               │
 │         └─────────────────┴───────────────────┘               │
@@ -41,6 +45,10 @@
                        │ GET /api/auth/me
                        │ POST /api/spaces
                        │ GET /api/spaces/mine
+                       │ GET /api/spaces/{id}
+                       │ GET /api/bookings/mine
+                       │ GET /api/bookings/{id}
+                       │ PATCH /api/bookings/{id}/approve|reject
                        ▼
 ┌──────────────────────────────────────────────────────────────┐
 │        Backend (FastAPI)  http://localhost:8000               │
@@ -49,7 +57,7 @@
 │  │  main.py (entry point)                                 │  │
 │  │  - starts FastAPI server                               │  │
 │  │  - enables CORS for frontend                           │  │
-│  │  - includes auth and spaces routes                     │  │
+│  │  - includes auth, spaces, and bookings routes            │  │
 │  └────────────────────────────────────────────────────────┘  │
 │                       │                                       │
 │  ┌────────────────────▼────────────────────────────────────┐  │
@@ -66,6 +74,14 @@
 │  │  - GET /api/spaces/mine (owner's listings, owner only) │  │
 │  │  - GET /api/spaces (public list)                       │  │
 │  │  - GET /api/spaces/{id} (public detail)                │  │
+│  └────────────────────┬───────────────────────────────────┘  │
+│                       │                                       │
+│  ┌────────────────────▼────────────────────────────────────┐  │
+│  │  routes/bookings.py (HTTP endpoints)                   │  │
+│  │  - GET /api/bookings/mine (owner's booking requests)   │  │
+│  │  - GET /api/bookings/{id} (booking detail)             │  │
+│  │  - PATCH /api/bookings/{id}/approve                    │  │
+│  │  - PATCH /api/bookings/{id}/reject                     │  │
 │  └────────────────────┬───────────────────────────────────┘  │
 │                       │                                       │
 │  ┌────────────────────▼────────────────────────────────────┐  │
@@ -88,6 +104,13 @@
 │  │  services/spaces.py (business logic)                   │  │
 │  │  - create_space()                                       │  │
 │  │  - list_spaces_by_owner()                               │  │
+│  └────────────────────┬───────────────────────────────────┘  │
+│                       │                                       │
+│  ┌────────────────────▼────────────────────────────────────┐  │
+│  │  services/bookings.py (business logic)                 │  │
+│  │  - list_bookings_for_owner()                            │  │
+│  │  - get_booking_for_owner()                              │  │
+│  │  - update_booking_status()                              │  │
 │  └────────────────────┬───────────────────────────────────┘  │
 │                       │                                       │
 │  ┌────────────────────▼────────────────────────────────────┐  │
@@ -127,7 +150,7 @@
 │      • description, rules                                    │
 │  - booking (reservation requests)                            │
 │      • booking_id, space_id, borrower_id, start_date,       │
-│      • end_date, status, created_at                          │
+│      • end_date, status, exchange_offer, created_at          │
 │  - space_photo (images)                                      │
 │      • photo_id, space_id, image_url, position               │
 │                                                               │
@@ -143,8 +166,8 @@
 
 | Component | Type | Runs How | Port | Purpose |
 |-----------|------|----------|------|---------|
-| Frontend | local/docker | Node.js in container | 3000 | Web UI (login, dashboard) |
-| Backend | local/docker | Python in container | 8000 | API server (auth + spaces endpoints) |
+| Frontend | local/docker | Node.js in container | 3000 | Match for Space UI (Next.js) |
+| Backend | local/docker | Python in container | 8000 | API server (auth, spaces, bookings) |
 | Database | local/docker | SQLite in container | - | User data and credentials |
 
 ## Tech Stack Decisions
@@ -411,9 +434,79 @@
    { id, name, location } only
    ↓
 6. Dashboard renders "Your Listings" section
-   - Each row: space name + location
+   - Each row: space name + location (links to /spaces/{id})
    - Empty state links to /spaces/new
 ```
+
+## Data Flow: Space Detail Page
+
+```
+1. User clicks a listing on dashboard (or navigates directly to /spaces/{id})
+   ↓
+2. Frontend loads /spaces/[id] (public — no ProtectedRoute)
+   ↓
+3. useParams() reads space id from URL
+   ↓
+4. GET /api/spaces/{id}
+   No auth header (public endpoint)
+   ↓
+5. Backend returns SpaceResponse or 404
+   ↓
+6. Detail page renders:
+   - name (title)
+   - location, description, rules (with fallbacks for empty fields)
+   - "Back to dashboard" link
+   ↓
+7. Loading / 404 / error states handled client-side
+```
+
+## Data Flow: Owner Booking Requests
+
+```
+1. Space owner loads /dashboard
+   ↓
+2. GET /api/bookings/mine
+   Headers: Authorization: Bearer <token>
+   ↓
+3. Backend: require_space_owner → list_bookings_for_owner(user.id)
+   - Joins booking → space (filter owner_id) → personal_account (borrower name)
+   ↓
+4. Dashboard renders three columns: Pending Approval, Confirmed, Rejected
+   - Pending rows: inline Accept / Reject (PATCH approve|reject)
+   - All rows link to /bookings/{id}
+   ↓
+5. Booking detail page shows space, borrower, dates, exchange_offer, status
+   - Pending bookings: Accept / Reject at bottom
+```
+
+## Frontend Design System (Match for Space)
+
+The UI is branded **Match for Space** with a purple-and-white aesthetic.
+
+| Token | Value | Usage |
+|-------|--------|--------|
+| `primary` | `#a166ff` | Buttons, links, headings, accents |
+| `primary-dark` | `#8a4de6` | Button hover states |
+| `primary-light` | `#f3ebff` | Subtle backgrounds (booking columns) |
+| Font | IBM Plex Sans | Loaded via `next/font/google` in `layout.tsx` |
+
+**Shared UI classes** (defined in `frontend/src/app/globals.css`):
+
+- `.btn-primary` — purple filled button, rounded
+- `.btn-outline` — purple border (e.g. "join us!" on landing)
+- `.input` — light gray fill, rounded, purple placeholder
+- `.card` — white container, soft shadow, rounded
+
+**Shared components:**
+
+- `LogoMark` — purple circle logo with house and sparkle
+- `PasswordInput` — password field with visibility toggle
+
+**Key routes:**
+
+- `/` — landing splash (login / join us buttons); redirects to dashboard if logged in
+- `/login` — "Wow you're back!" login screen
+- `/register` — "Nice to meet you!" registration screen
 
 ## External Dependencies
 
@@ -435,6 +528,7 @@
 | Invalid form input | Client-side validation | Show field-level error message |
 | Not space owner | Wrong account type on protected endpoint | 403 or redirect to dashboard |
 | Space validation failed | Missing/invalid listing fields | 400 with detail message |
+| Space not found | Invalid or deleted space id | 404 on detail page |
 
 ## Environment Configuration
 
@@ -507,6 +601,7 @@ booking
 ├─ start_date
 ├─ end_date
 ├─ status (pending | approved | rejected)
+├─ exchange_offer (Text, nullable)
 └─ created_at
 
 space_photo
@@ -574,31 +669,38 @@ Community Space Sharing Platform - Excel Import
 
 → see DECISIONS.md #12, #13, #14, and #15 for the "why" behind this approach
 
-## Current Phase: Space Listings (Partial)
+## Current Phase: Listings, Bookings, and UI
 
 **Implemented:**
+- **Match for Space UI** — purple (`#a166ff`), IBM Plex Sans, landing splash, redesigned login/register
 - Space owners can create listings via `POST /api/spaces` and `/spaces/new`
-- Space model includes `description` and `rules` (app-requirements §3)
-- Owner dashboard shows their listings (name + location) via `GET /api/spaces/mine`
-- Public `GET /api/spaces` and `GET /api/spaces/{id}` for discovery (detail page not built yet)
-- Demo seed data (`seed_data.py`) in English with description/rules populated
+- Owner dashboard: listings (linked to detail) + booking requests in three columns (pending, confirmed, rejected)
+- Owner can approve/reject pending bookings from dashboard or `/bookings/{id}`
+- Booking responses include `exchange_offer` (what the borrower offers in exchange)
+- Minimal public space detail page at `/spaces/[id]`
+- Bookings API: `GET /api/bookings/mine`, `GET /api/bookings/{id}`, `PATCH approve|reject`
+- Demo seed data (`seed_data.py`) with mixed booking statuses and `demoowner` / `secret12` login
+- SQLite migration for `exchange_offer` column on startup (`database.py`)
+- Backend tests for auth, spaces, and bookings (58 tests)
 
 **Not yet implemented:**
+- `POST /api/bookings` (borrower booking request form)
 - Photo upload / `space_photo` creation from the UI
 - Availability calendar widget (text field only for now)
-- Space detail page and Book Now flow
-- Filtering dashboard bookings, messages, calendar
+- Photo gallery and Book Now flow on detail page
+- Public search/filter UI
+- User dashboard booking sections, chat, messages
 
 ## Next Phases
 
 ### Phase 2: Space Discovery (remaining)
 - Space search/filter UI and proximity ordering
-- Space detail page with photo gallery
+- Full detail page (photo gallery, calendar, Book Now)
 - User dashboard sections (bookings, saved spaces)
 
-### Phase 3: Booking & Chat
-- Add booking form and calendar
-- Add real-time chat (WebSocket or polling)
+### Phase 3: Booking (borrower side) & Chat
+- Booking request form for users (`POST /api/bookings`)
+- Real-time chat (WebSocket or polling)
 
 ### Phase 4: Production Deployment
 - Switch to httpOnly cookies instead of localStorage

@@ -173,10 +173,10 @@ function ListSpaceContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-white flex items-center justify-center p-4">
       <div className="card max-w-lg w-full">
         <div className="mb-8 text-center">
-          <h1 className="text-2xl font-bold text-dark mb-2">List a Space</h1>
+          <h1 className="text-2xl font-bold text-primary mb-2">List a Space</h1>
           <p className="text-gray-600">Share your space with the community</p>
         </div>
 

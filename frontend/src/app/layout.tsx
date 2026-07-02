@@ -1,17 +1,21 @@
 /**
  * Root Layout for the Application
  * Wraps all pages with AuthProvider to enable authentication context
- * 
- * See: AuthProvider in src/lib/auth.tsx
- * See: DECISIONS.md #5 (Frontend Authentication State)
  */
 
 import type { Metadata } from 'next'
+import { IBM_Plex_Sans } from 'next/font/google'
 import { AuthProvider } from '@/lib/auth'
 import './globals.css'
 
+const ibmPlexSans = IBM_Plex_Sans({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-ibm-plex-sans',
+})
+
 export const metadata: Metadata = {
-  title: 'Community Space Sharing Platform',
+  title: 'Match for Space',
   description: 'Share and discover spaces in your community',
 }
 
@@ -22,7 +26,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>
+      <body className={`${ibmPlexSans.variable} ${ibmPlexSans.className} font-sans`}>
         <AuthProvider>
           {children}
         </AuthProvider>

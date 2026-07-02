@@ -109,6 +109,7 @@ class Booking(Base):
     start_date = Column(DateTime, nullable=True)
     end_date = Column(DateTime, nullable=True)
     status = Column(String(50), default="pending", nullable=False)
+    exchange_offer = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     
     def __repr__(self):

@@ -1,14 +1,13 @@
-/* Global Styles for Community Space Sharing Platform */
+/* Global Styles for Match for Space */
 /* → see Tailwind configuration in tailwind.config.js */
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Custom base styles */
 @layer base {
   body {
-    @apply bg-light text-dark;
+    @apply bg-white text-dark;
   }
 
   h1 {
@@ -20,37 +19,35 @@
   }
 }
 
-/* Custom component styles */
 @layer components {
-  /* Cards */
   .card {
-    @apply bg-white rounded-lg shadow-md p-6 border border-gray-200;
+    @apply bg-white rounded-2xl shadow-sm p-6 border border-gray-100;
   }
 
-  /* Buttons */
   .btn {
-    @apply px-4 py-2 rounded-lg font-medium transition-colors;
+    @apply px-6 py-3 rounded-2xl font-semibold transition-colors;
   }
 
   .btn-primary {
-    @apply btn bg-primary text-white hover:bg-blue-600;
+    @apply btn bg-primary text-white hover:bg-primary-dark;
   }
 
   .btn-secondary {
-    @apply btn bg-light text-dark border border-gray-300 hover:bg-gray-100;
+    @apply btn bg-white text-dark border-2 border-gray-200 hover:bg-gray-50;
   }
 
-  /* Form inputs */
+  .btn-outline {
+    @apply btn bg-white text-primary border-2 border-primary hover:bg-primary-light;
+  }
+
   .input {
-    @apply w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent;
+    @apply w-full px-4 py-3 bg-gray-100 border-0 rounded-2xl text-dark placeholder:text-primary/60 focus:outline-none focus:ring-2 focus:ring-primary/40;
   }
 
-  /* Error message */
   .error-text {
     @apply text-red-600 text-sm mt-1;
   }
 
-  /* Success message */
   .success-text {
     @apply text-green-600 text-sm mt-1;
   }

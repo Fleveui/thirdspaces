@@ -7,12 +7,14 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // Community-friendly color palette
-        primary: '#3b82f6',     // Blue
-        accent: '#10b981',      // Green (growth, community)
-        warm: '#f59e0b',        // Amber (friendly)
-        light: '#f3f4f6',       // Light gray
-        dark: '#1f2937',        // Dark gray
+        primary: '#a166ff',
+        'primary-dark': '#8a4de6',
+        'primary-light': '#f3ebff',
+        light: '#fafafa',
+        dark: '#1f2937',
+      },
+      fontFamily: {
+        sans: ['var(--font-ibm-plex-sans)', 'system-ui', 'sans-serif'],
       },
     },
   },
