@@ -27,6 +27,8 @@ def _migrate_schema(connection) -> None:
         connection.execute(text("ALTER TABLE booking ADD COLUMN owner_signed_at DATETIME"))
     if not _column_exists(connection, "spaces", "exchange_preferences"):
         connection.execute(text("ALTER TABLE spaces ADD COLUMN exchange_preferences TEXT"))
+    if not _column_exists(connection, "spaces", "max_people"):
+        connection.execute(text("ALTER TABLE spaces ADD COLUMN max_people INTEGER"))
 
 
 # Create database engine (SQLite)

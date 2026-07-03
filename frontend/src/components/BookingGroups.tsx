@@ -81,6 +81,30 @@ export function OwnerBookingGroup({
   )
 }
 
+export function BorrowerBookingRow({ booking }: { booking: BorrowerBooking }) {
+  return (
+    <Link
+      href={`/bookings/${booking.booking_id}`}
+      className="flex items-center justify-between gap-4 p-4 rounded-2xl border border-gray-100 bg-white hover:bg-primary-light/30 transition-colors"
+    >
+      <div className="min-w-0 flex-1">
+        <p className="font-medium text-dark truncate">{booking.space_name}</p>
+        <p className="text-sm text-gray-600">
+          {formatDateRange(booking.start_date, booking.end_date)}
+        </p>
+        {borrowerStatusMessage(booking.status) && (
+          <p className="text-sm text-gray-500 mt-0.5 italic truncate">
+            {borrowerStatusMessage(booking.status)}
+          </p>
+        )}
+      </div>
+      <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-primary-light text-primary shrink-0">
+        {statusLabel(booking.status)}
+      </span>
+    </Link>
+  )
+}
+
 export function BorrowerBookingGroup({
   title,
   bookings,

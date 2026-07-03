@@ -23,10 +23,10 @@
 │  │ List Space   │  │ Space Detail │  │  Messages    │        │
 │  │ /spaces/new  │  │ /spaces/[id] │  │  /messages   │        │
 │  └──────────────┘  └──────────────┘  └──────────────┘        │
-│  ┌──────────────┐  AppShell + ModeNav (Find | My spaces)      │
-│  │ Booking Dtl  │  /register/verified (post-signup)            │
-│  │ /bookings/id │                                            │
-│  └──────────────┘                                            │
+│  ┌──────────────┐  ┌──────────────┐  PageHeader + minimal    │
+│  │ Booking Dtl  │  │ Incoming Req │  AppShell (find | host)   │
+│  │ /bookings/id │  │/host/requests│  /find/requests (borrower)│
+│  └──────────────┘  └──────────────┘  /register/verified       │
 │         │                 │                   │               │
 │         └─────────────────┴───────────────────┘               │
 │                       │                                       │
@@ -353,7 +353,7 @@
    - Valid → continue
    ↓
 7. Create JWT token (services/auth.py)
-   - Payload: user_id, expiration (30 min), issued_at
+   - Payload: user_id, expiration (default 24 h), issued_at
    - Signed with SECRET_KEY from config.py
    ↓
 8. Return success response
@@ -377,7 +377,7 @@
    ↓
 12. Dashboard checks ProtectedRoute
     - Token valid? → render dashboard
-    - Token expired? → redirect to /login
+    - Token expired? → redirect to landing (/)
 ```
 
 ## Data Flow: Accessing Protected Pages
@@ -415,13 +415,15 @@
 ```
 1. User logs in → redirects to /dashboard (home hub)
    ↓
-2. Hub shows two mode cards:
+2. Hub shows mode cards and request strips:
    - Find a space → /find
-   - My spaces → /host
-   Optional badges for pending booking requests
+   - My booking requests → /find/requests
+   - List your space → /host
+   - Incoming requests → /host/requests
+   Optional badges for pending booking counts
    ↓
-3. AppShell wraps /find and /host with ModeNav toggle
-   (persistent header: Find | My spaces)
+3. Task pages use AppShell variant="minimal" + PageHeader (contextual back arrows)
+   Legacy full AppShell with ModeNav still available for some routes
    ↓
 4. /spaces redirects to /find (legacy route)
 ```
@@ -441,7 +443,7 @@
    ↓
 5. User clicks space → /spaces/{id} → Book Now flow
    ↓
-6. GET /api/bookings/my-requests → "My booking requests" section on /find
+6. GET /api/bookings/my-requests → "My booking requests" on `/find` and `/find/requests`
 ```
 
 ## Data Flow: Create Space Listing (Any Logged-in User)
@@ -476,19 +478,27 @@
 ## Data Flow: Host Mode (Owner Listings & Requests)
 
 ```
-1. User loads /host (ProtectedRoute + AppShell)
+1. User loads /host (ProtectedRoute + AppShell mode="host")
+   Intro hub: "View my listings" → /host?view=listings, "Add a space" → /spaces/new
    ↓
-2. GET /api/spaces/mine
-   Headers: Authorization: Bearer <token>
+2. Listings view (/host?view=listings):
+   GET /api/spaces/mine + GET /api/bookings/mine (parallel)
    ↓
-3. Backend: list_spaces_by_owner(user.id)
+3. countBookingsBySpace() → per-space request count on SpaceCard rows
+   Badge links to /host/requests?space_id={id} (when count > 0)
    ↓
-4. GET /api/bookings/mine → incoming requests
+4. Click listing → /spaces/{id} (own-listing detail view)
+   - All list-a-space fields, photo placeholder
+   - Request strip above photo → /host/requests?space_id={id}
+   - Back arrow → /host?view=listings
    ↓
-5. Host page renders:
-   - Your listings (links to /spaces/{id})
-   - Booking requests via BookingGroups (pending / confirmed / rejected)
-   - "Add a space" CTA → /spaces/new
+5. Incoming requests page (/host/requests):
+   GET /api/bookings/mine → pending / confirmed / rejected sections
+   Accept/Reject on pending cards (PATCH approve|reject)
+   ↓
+6. Contextual back navigation (hostNavigation.ts):
+   - ?space_id={id} on URL → back to /spaces/{id}
+   - No space_id (from dashboard) → back to /dashboard
 ```
 
 ## Data Flow: Borrower Booking Request
@@ -505,8 +515,8 @@
 4. services/bookings.py → create_booking()
    - Status: pending
    ↓
-5. Borrower sees request on /find (My booking requests)
-   Owner sees it on /host (incoming requests)
+5. Borrower sees request on /find and /find/requests
+   Owner sees it on /host/requests (and via per-space badges on listings)
 ```
 
 ## Data Flow: Contract Signing & Ratings
@@ -547,87 +557,92 @@
 ## Data Flow: Space Detail Page
 
 ```
-1. User clicks a listing on dashboard (or navigates directly to /spaces/{id})
+1. User opens /spaces/{id} (ProtectedRoute)
    ↓
-2. Frontend loads /spaces/[id] (public — no ProtectedRoute)
+2. GET /api/spaces/{id} — public detail; photos included
    ↓
-3. useParams() reads space id from URL
+3. Frontend detects isOwnSpace (user.id === space.owner_id)
    ↓
-4. GET /api/spaces/{id}
-   No auth header (public endpoint)
+4a. Find view (not owner):
+   - Purple/lavender accents, availability badge
+   - Book Now form for authenticated non-owners
+   - Back → /find
    ↓
-5. Backend returns SpaceResponse or 404
+4b. Own-listing view (owner):
+   - Host cream accents; all list-a-space fields + photo placeholder
+   - GET /api/bookings/mine → request count strip above photo
+   - No availability badge; back → /host?view=listings
    ↓
-6. Detail page renders:
-   - name (title)
-   - location, description, rules, exchange_preferences
-   - Book Now form (authenticated users)
-   - Photo gallery when photos exist
-   - AppShell back link to /find
-   ↓
-7. Loading / 404 / error states handled client-side
+5. Loading / 404 / error states handled client-side
 ```
 
 ## Data Flow: Owner Booking Requests (Host Mode)
 
 ```
-1. User loads /host
+1. User opens /host/requests (from dashboard or via ?space_id={id} from listing flow)
    ↓
 2. GET /api/bookings/mine
    Headers: Authorization: Bearer <token>
    ↓
 3. Backend: list_bookings_for_owner(user.id)
-   - Joins booking → space (filter owner_id) → personal_account (borrower name)
    ↓
-4. BookingGroups renders three columns: Pending Approval, Confirmed, Rejected
-   - Pending rows: inline Accept / Reject (PATCH approve|reject)
-   - All rows link to /bookings/{id}
+4. IncomingRequestCard sections: Pending, Confirmed (green), Rejected (red)
+   - Pending: Accept / Reject (PATCH approve|reject)
+   - All cards link to /bookings/{id}
    ↓
-5. Booking detail page shows space, borrower, dates, exchange_offer, contract, status
-   - Pending bookings: Accept / Reject at bottom
-   - Approved: sign contract; completed: rate
+5. Back arrow: hostRequestsBackHref(space_id) → /spaces/{id} or /dashboard
 ```
 
 ## Frontend Design System (Match for Space)
 
-The UI is branded **Match for Space** with a purple-and-white aesthetic.
+The UI is branded **Match for Space** with dual accents: purple for **Find** and cream for **Host**.
 
 | Token | Value | Usage |
 |-------|--------|--------|
-| `primary` | `#a166ff` | Buttons, links, headings, accents |
+| `primary` | `#a166ff` | Find buttons, links, lavender inputs |
 | `primary-dark` | `#8a4de6` | Button hover states |
-| `primary-light` | `#f3ebff` | Subtle backgrounds (booking columns) |
+| `primary-light` | `#f3ebff` | Find subtle backgrounds |
+| `host-cream` | `#f7d58f` | Host buttons, badges, strips (max darkness) |
+| `host-cream-light` | `#fae4ad` | Host input backgrounds |
+| `host-cream-accent` | `#8b6018` | Host text accents |
 | Font | IBM Plex Sans | Loaded via `next/font/google` in `layout.tsx` |
 
 **Shared UI classes** (defined in `frontend/src/app/globals.css`):
 
-- `.btn-primary` — purple filled button, rounded
-- `.btn-outline` — purple border (e.g. "join us!" on landing)
-- `.input` — light gray fill, rounded, purple placeholder
+- `.btn-primary` — purple filled button (find flow)
+- `.btn-host` / `.btn-host-outline` — cream gradient / outline (host flow)
+- `.input-lavender` — find form inputs
+- `.input-cream` — host form inputs
 - `.card` — white container, soft shadow, rounded
 
 **Shared components:**
 
-- `LogoMark` — purple circle logo with house and sparkle
-- `PasswordInput` — password field with visibility toggle
-- `AppShell` — page shell with header, ModeNav, and back links
-- `ModeNav` — Find | My spaces toggle in header
-- `BookingGroups` — three-column booking request layout (pending / confirmed / rejected)
+- `LogoMark` — logo with `badge` and `mark` variants
+- `SparkleIcon` — star icon (CSS mask from `/star.png`)
+- `PageHeader` — back arrow + title (contextual navigation)
+- `AppShell` — `mode` (find | host), `variant` (full | minimal)
+- `HubActionCard` — dashboard mode cards and request strips
+- `SpaceCard` — listing card/row with find or host accent; request badge on host listings
+- `IncomingRequestCard` — host incoming request card (cream / green / red status)
+- `MyBookingRequestCard` — borrower request card (find accent)
+- `CategoryChips` — category selector (`variant="find"` | `"host"`)
+
+**Navigation helpers:**
+
+- `frontend/src/lib/hostNavigation.ts` — `hostRequestsHref(spaceId?)`, `hostRequestsBackHref(spaceId)`
 
 **Key routes:**
 
-- `/` — landing splash (login / join us buttons); redirects to dashboard if logged in
-- `/login` — "Wow you're back!" login screen
-- `/register` — "Nice to meet you!" registration screen (terms/privacy acceptance)
-- `/register/verified` — post-registration confirmation screen
-- `/dashboard` — home hub (choose Find a space or My spaces)
-- `/find` — search, filters, my booking requests (own listings excluded from search)
-- `/host` — my listings, incoming requests, add a space
-- `/spaces` — redirects to `/find`
-- `/spaces/new` — create listing form
-- `/spaces/[id]` — space detail + Book Now
-- `/bookings/[id]` — booking detail, approve/reject, contract signing, ratings
-- `/messages` — chat conversations (WebSocket per booking)
+- `/` — landing with inline login; `/login` redirects here
+- `/register` — registration; `/register/verified` — post-signup confirmation
+- `/dashboard` — home hub (Find, My booking requests, List your space, Incoming requests)
+- `/find` — intro + search/results; `/find/requests` — borrower's outgoing requests
+- `/host` — intro hub; `/host?view=listings` — your listing rows
+- `/host/requests` — incoming requests (`?space_id={id}` for contextual back)
+- `/spaces/new` — create listing (cream form)
+- `/spaces/[id]` — space detail (find or own-listing view)
+- `/bookings/[id]` — booking detail, approve/reject, contract, ratings
+- `/messages` — chat (WebSocket per booking)
 
 ## External Dependencies
 
@@ -643,7 +658,7 @@ The UI is branded **Match for Space** with a purple-and-white aesthetic.
 | Invalid credentials | Wrong password or unknown user | Show "Invalid username or password" |
 | Username exists | Duplicate on registration | Show "Username already taken" |
 | Email exists | Duplicate on registration | Show "Email already in use" |
-| Token expired | 30 min inactivity | Redirect to /login |
+| Token expired | JWT past expiry | Redirect to landing; session cleared via authFetch |
 | Token invalid | Tampered or corrupt | Reject and redirect to /login |
 | Backend unreachable | Service down | Show "Network error. Try again" |
 | Invalid form input | Client-side validation | Show field-level error message |
@@ -663,7 +678,7 @@ All configuration in one place: `backend/config.py`
 | FRONTEND_URL | http://localhost:3000 | CORS origin |
 | DATABASE_URL | sqlite:///app.db | SQLite path |
 | SECRET_KEY | dev-secret-key-... | JWT signing key (change in production) |
-| ACCESS_TOKEN_EXPIRE_MINUTES | 30 | JWT token lifetime |
+| ACCESS_TOKEN_EXPIRE_MINUTES | 1440 | JWT token lifetime (24 h default) |
 | ALLOWED_ORIGINS | [FRONTEND_URL] | CORS whitelist |
 
 Frontend: `.env.local`
@@ -681,7 +696,7 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 
 ⚠️ **Not implemented (for future phases):**
 - HTTPS/TLS (only development)
-- Refresh tokens (current token lasts 30 min)
+- Refresh tokens (current token lasts 24 h by default)
 - Rate limiting on auth endpoints
 - CSRF protection (not needed for SPA + CORS)
 - Logout token blacklist
@@ -819,16 +834,21 @@ Community Space Sharing Platform - Excel Import
 ## Current Phase: Full Flowchart MVP
 
 **Implemented:**
-- **Match for Space UI** — purple (`#a166ff`), IBM Plex Sans, landing splash, redesigned login/register
-- **Find/Host mode split** — `/dashboard` hub, `/find` (search + my requests), `/host` (listings + incoming requests), `ModeNav` + `AppShell`
-- **Space discovery** — filterable `GET /api/spaces`; optional auth excludes own listings when browsing as logged-in user
-- **Listings** — create via `/spaces/new`, photo upload (`POST /api/spaces/{id}/photos`), `exchange_preferences` field
-- **Borrower booking** — Book Now on detail page, `POST /api/bookings`, my requests on `/find`
-- **Owner workflow** — approve/reject, contract signing, ratings on `/bookings/{id}` and `/host`
-- **Chat** — `/messages`, WebSocket `/api/chat/ws/{booking_id}`, conversation persistence
-- **Registration** — terms/privacy acceptance, linked `PersonalAccount`/`BusinessAccount`, `/register/verified`
-- **Demo seed** — Milan spaces (owner1 / `demoowner`), 4 Bolzano spaces (owner2), mixed booking statuses
-- Backend tests for auth, spaces, bookings, and chat (61+ tests)
+- **Match for Space UI** — dual theme: find purple (`#a166ff`), host cream (`#f7d58f`), IBM Plex Sans, landing login on `/`
+- **Dashboard hub** — mode cards plus My booking requests and Incoming requests strips with pending badges
+- **Find/Host intro + task views** — `/find` and `/host` mirror layout (intro → results/listings); `/find/requests`, `/host/requests`
+- **Contextual navigation** — `PageHeader` back arrows; `hostNavigation.ts` (`space_id` on incoming requests)
+- **Space detail** — full list-a-space fields, photo placeholder, owner vs find accents and actions
+- **Host listing badges** — per-space booking request counts on My spaces (replaces availability pill)
+- **Incoming requests UI** — cream theme; confirmed green / rejected red badges and card outlines
+- **Space discovery** — filterable `GET /api/spaces`; optional auth excludes own listings
+- **Listings** — cream form at `/spaces/new`, photo upload, `exchange_preferences`
+- **Borrower booking** — Book Now, `/find/requests`, lavender form styling
+- **Owner workflow** — approve/reject on `/host/requests`, contracts and ratings on `/bookings/{id}`
+- **Auth** — `authFetch`, 401 session clearing, 24 h JWT default
+- **Chat** — `/messages`, WebSocket
+- **Demo seed** — Milan + Bolzano spaces, `demoowner` / `secret12`
+- Backend tests (61+)
 
 **Not yet implemented:**
 - Availability calendar widget (text field only for now)

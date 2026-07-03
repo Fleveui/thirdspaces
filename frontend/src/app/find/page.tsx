@@ -1,51 +1,55 @@
 /**
- * Find mode — search spaces and track your booking requests.
+ * Find mode — intro search hub and available spaces results.
  */
 
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
 import { AppShell } from '@/components/AppShell'
-import { BorrowerBookingGroup } from '@/components/BookingGroups'
+import { PageHeader } from '@/components/PageHeader'
+import { SearchBar } from '@/components/SearchBar'
+import { CategoryChips } from '@/components/CategoryChips'
+import { SpaceCard } from '@/components/SpaceCard'
+import { FilterPanel } from '@/components/FilterPanel'
+import { SparkleIcon } from '@/components/SparkleIcon'
+import { MyBookingRequestCard } from '@/components/MyBookingRequestCard'
 import { BorrowerBooking } from '@/lib/bookings'
-import { SpaceListing, resolveImageUrl, outdoorLabel } from '@/lib/spaces'
+import {
+  SPACE_CATEGORIES,
+  SpaceListing,
+  SpaceFilters,
+  emptyFilters,
+  buildSpacesQuery,
+} from '@/lib/spaces'
 
-const CATEGORIES = ['Loft', 'Terrazza', 'Studio', 'Orto', 'Ufficio']
+type FindView = 'intro' | 'results'
 
 function FindContent() {
+  const router = useRouter()
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
   const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null
 
+  const [view, setView] = useState<FindView>('intro')
   const [spaces, setSpaces] = useState<SpaceListing[]>([])
   const [borrowerBookings, setBorrowerBookings] = useState<BorrowerBooking[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [borrowerLoading, setBorrowerLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [borrowerError, setBorrowerError] = useState<string | null>(null)
   const [showFilters, setShowFilters] = useState(false)
-  const [filters, setFilters] = useState({
-    category: '',
-    is_outdoor: '',
-    min_area: '',
-    max_area: '',
-    location: '',
-    availability: '',
-  })
+  const [searchText, setSearchText] = useState('')
+  const [filters, setFilters] = useState<SpaceFilters>(emptyFilters())
 
   const fetchSpaces = useCallback(async () => {
     setLoading(true)
     try {
-      const params = new URLSearchParams()
-      if (filters.category) params.set('category', filters.category)
-      if (filters.is_outdoor !== '') params.set('is_outdoor', filters.is_outdoor)
-      if (filters.min_area) params.set('min_area', filters.min_area)
-      if (filters.max_area) params.set('max_area', filters.max_area)
-      if (filters.location) params.set('location', filters.location)
-      if (filters.availability) params.set('availability', filters.availability)
-
-      const qs = params.toString()
+      const merged: SpaceFilters = {
+        ...filters,
+        location: searchText.trim() || filters.location,
+      }
+      const qs = buildSpacesQuery(merged).toString()
       const response = await fetch(`${apiUrl}/api/spaces${qs ? `?${qs}` : ''}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       })
@@ -57,7 +61,7 @@ function FindContent() {
     } finally {
       setLoading(false)
     }
-  }, [apiUrl, filters, token])
+  }, [apiUrl, filters, searchText, token])
 
   const fetchBorrowerBookings = useCallback(async () => {
     try {
@@ -78,151 +82,139 @@ function FindContent() {
   }, [apiUrl, token])
 
   useEffect(() => {
-    fetchSpaces()
-  }, [fetchSpaces])
+    if (view === 'results') {
+      fetchSpaces()
+    }
+  }, [view, fetchSpaces])
 
   useEffect(() => {
     if (token) fetchBorrowerBookings()
   }, [token, fetchBorrowerBookings])
 
-  const pending = borrowerBookings.filter((b) => b.status === 'pending')
-  const approved = borrowerBookings.filter((b) => b.status === 'approved')
-  const past = borrowerBookings.filter((b) => b.status === 'rejected')
+  const goToResults = (category?: string) => {
+    if (category !== undefined) {
+      setFilters((f) => ({ ...f, category }))
+    }
+    setView('results')
+  }
 
   return (
-    <AppShell mode="find">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-dark">Find a space</h1>
-        <p className="text-gray-600 text-sm mt-1">Browse and book community spaces</p>
-      </div>
+    <AppShell mode="find" variant="minimal">
+      {view === 'intro' ? (
+        <div className="max-w-xl mx-auto">
+          <PageHeader title="Find a space" onBack={() => router.push('/dashboard')} />
 
-      <div className="flex flex-wrap gap-3 mb-6">
-        <button
-          type="button"
-          onClick={() => setShowFilters((v) => !v)}
-          className="btn-outline text-sm"
-        >
-          {showFilters ? 'Hide filters' : 'Filter search'}
-        </button>
-      </div>
+          <div className="text-center mb-8">
+            <SparkleIcon size={28} className="text-primary mx-auto mb-4" />
+            <p className="text-gray-500 text-sm">What kind of space are you looking for?</p>
+          </div>
 
-      {showFilters && (
-        <div className="card mb-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-          <select
-            value={filters.category}
-            onChange={(e) => setFilters((f) => ({ ...f, category: e.target.value }))}
-            className="input"
-          >
-            <option value="">All categories</option>
-            {CATEGORIES.map((c) => (
-              <option key={c} value={c}>{c}</option>
-            ))}
-          </select>
-          <select
-            value={filters.is_outdoor}
-            onChange={(e) => setFilters((f) => ({ ...f, is_outdoor: e.target.value }))}
-            className="input"
-          >
-            <option value="">Indoor or outdoor</option>
-            <option value="false">Indoor</option>
-            <option value="true">Outdoor</option>
-          </select>
-          <input
-            type="text"
-            placeholder="Location"
-            value={filters.location}
-            onChange={(e) => setFilters((f) => ({ ...f, location: e.target.value }))}
-            className="input"
+          <div className="space-y-6 mb-8">
+            <SearchBar
+              value={searchText}
+              onChange={setSearchText}
+              onSubmit={() => goToResults()}
+            />
+
+            <div>
+              <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-3">
+                Do you want to filter the results?
+              </p>
+              <button
+                type="button"
+                onClick={() => setShowFilters(true)}
+                className="w-full flex items-center justify-between gap-3 px-4 py-3.5 rounded-3xl bg-primary-light/50 text-dark hover:bg-primary-light transition-colors"
+              >
+                <span className="flex items-center gap-3">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M4 6h16M6 12h12M8 18h8" />
+                  </svg>
+                  Apply filters
+                </span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M9 18l6-6-6-6" />
+                </svg>
+              </button>
+            </div>
+
+            <button type="button" onClick={() => goToResults()} className="btn-primary w-full rounded-3xl py-4">
+              Browse all spaces
+            </button>
+          </div>
+
+          <div>
+            <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-3">Categories</p>
+            <CategoryChips
+              categories={SPACE_CATEGORIES}
+              selected={filters.category}
+              onSelect={(cat) => goToResults(cat)}
+            />
+          </div>
+        </div>
+      ) : (
+        <div className="max-w-5xl mx-auto">
+          <PageHeader
+            title="Available spaces"
+            onBack={() => setView('intro')}
+            rightAction={
+              <button
+                type="button"
+                onClick={() => setShowFilters(true)}
+                className="w-10 h-10 rounded-full bg-primary-light flex items-center justify-center text-primary"
+                aria-label="Open filters"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M4 6h16M6 12h12M8 18h8" />
+                </svg>
+              </button>
+            }
           />
-          <input
-            type="number"
-            placeholder="Min area (m²)"
-            value={filters.min_area}
-            onChange={(e) => setFilters((f) => ({ ...f, min_area: e.target.value }))}
-            className="input"
-          />
-          <input
-            type="number"
-            placeholder="Max area (m²)"
-            value={filters.max_area}
-            onChange={(e) => setFilters((f) => ({ ...f, max_area: e.target.value }))}
-            className="input"
-          />
-          <input
-            type="text"
-            placeholder="Availability"
-            value={filters.availability}
-            onChange={(e) => setFilters((f) => ({ ...f, availability: e.target.value }))}
-            className="input"
-          />
-          <button type="button" onClick={fetchSpaces} className="btn-primary text-sm md:col-span-3">
-            Apply filters
-          </button>
+
+          <section className="rounded-3xl bg-gradient-to-br from-primary to-primary-dark p-5 mb-6 max-w-xl mx-auto">
+            <h2 className="font-semibold text-white mb-4">My booking requests</h2>
+            {borrowerLoading ? (
+              <p className="text-white/80 text-sm">Loading your bookings...</p>
+            ) : borrowerError ? (
+              <p className="text-red-100 text-sm">{borrowerError}</p>
+            ) : borrowerBookings.length === 0 ? (
+              <p className="text-white/80 text-sm">No bookings yet. Pick a space below to get started.</p>
+            ) : (
+              <ul className="space-y-3">
+                {borrowerBookings.map((booking) => (
+                  <li key={booking.booking_id}>
+                    <MyBookingRequestCard booking={booking} />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          {loading ? (
+            <p className="text-gray-600 text-sm text-center py-12">Loading spaces...</p>
+          ) : error ? (
+            <p className="text-red-600 text-sm text-center py-12">{error}</p>
+          ) : spaces.length === 0 ? (
+            <p className="text-gray-600 text-center py-12">No spaces found. Try adjusting your filters.</p>
+          ) : (
+            <div className="space-y-3 mb-10 max-w-xl mx-auto">
+              {spaces.map((space) => (
+                <SpaceCard key={space.id} space={space} apiUrl={apiUrl} layout="row" />
+              ))}
+            </div>
+          )}
         </div>
       )}
 
-      <section className="mb-10">
-        {loading ? (
-          <p className="text-gray-600 text-sm">Loading spaces...</p>
-        ) : error ? (
-          <p className="text-red-600 text-sm">{error}</p>
-        ) : spaces.length === 0 ? (
-          <p className="text-gray-600">No spaces found. Try adjusting your filters.</p>
-        ) : (
-          <>
-            <p className="text-sm text-gray-500 mb-4">Sorted by relevance</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {spaces.map((space) => {
-                const img = resolveImageUrl(space.image_url, apiUrl)
-                return (
-                  <Link
-                    key={space.id}
-                    href={`/spaces/${space.id}`}
-                    className="card hover:shadow-md transition-shadow block overflow-hidden p-0"
-                  >
-                    <div className="h-40 bg-primary-light flex items-center justify-center">
-                      {img ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={img} alt={space.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <span className="text-primary text-sm">No photo</span>
-                      )}
-                    </div>
-                    <div className="p-4">
-                      <h2 className="font-semibold text-dark">{space.name}</h2>
-                      <p className="text-sm text-gray-600">{space.location || 'Location TBD'}</p>
-                      <p className="text-xs text-gray-500 mt-2">
-                        {outdoorLabel(space.is_outdoor)}
-                        {space.area_m2 ? ` · ${space.area_m2} m²` : ''}
-                      </p>
-                      {space.availability && (
-                        <p className="text-xs text-primary mt-1">{space.availability}</p>
-                      )}
-                    </div>
-                  </Link>
-                )
-              })}
-            </div>
-          </>
-        )}
-      </section>
-
-      <section className="card">
-        <h2 className="font-semibold text-dark mb-4">My booking requests</h2>
-        {borrowerLoading ? (
-          <p className="text-gray-600 text-sm">Loading your bookings...</p>
-        ) : borrowerError ? (
-          <p className="text-red-600 text-sm">{borrowerError}</p>
-        ) : borrowerBookings.length === 0 ? (
-          <p className="text-gray-600 text-sm">No bookings yet. Pick a space above to get started.</p>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <BorrowerBookingGroup title="Pending approval" bookings={pending} />
-            <BorrowerBookingGroup title="Upcoming" bookings={approved} />
-            <BorrowerBookingGroup title="Past" bookings={past} />
-          </div>
-        )}
-      </section>
+      <FilterPanel
+        open={showFilters}
+        filters={filters}
+        onChange={setFilters}
+        onClose={() => setShowFilters(false)}
+        onApply={() => {
+          setView('results')
+          fetchSpaces()
+        }}
+      />
     </AppShell>
   )
 }

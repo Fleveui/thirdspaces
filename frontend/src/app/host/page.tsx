@@ -1,168 +1,159 @@
 /**
- * Host mode — manage listings and incoming booking requests.
+ * Host mode — intro hub and listings view (mirrors Find a space layout).
  */
 
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
 import { AppShell } from '@/components/AppShell'
-import { OwnerBookingGroup } from '@/components/BookingGroups'
-import { OwnerBooking } from '@/lib/bookings'
+import { PageHeader } from '@/components/PageHeader'
+import { SpaceCard } from '@/components/SpaceCard'
+import { SparkleIcon } from '@/components/SparkleIcon'
+import { SpaceListing } from '@/lib/spaces'
+import { countBookingsBySpace, OwnerBooking } from '@/lib/bookings'
+import { useAuth, SessionExpiredError } from '@/lib/auth'
 
-interface SpaceListing {
-  id: string
-  name: string
-  location: string | null
-}
+type HostView = 'intro' | 'listings'
 
 function HostContent() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const { authFetch } = useAuth()
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-  const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null
 
+  const [view, setView] = useState<HostView>(() =>
+    searchParams.get('view') === 'listings' ? 'listings' : 'intro'
+  )
   const [listings, setListings] = useState<SpaceListing[]>([])
-  const [ownerBookings, setOwnerBookings] = useState<OwnerBooking[]>([])
-  const [loading, setLoading] = useState(true)
-  const [bookingsLoading, setBookingsLoading] = useState(true)
+  const [fullSpaces, setFullSpaces] = useState<SpaceListing[]>([])
+  const [requestCountBySpace, setRequestCountBySpace] = useState<Record<string, number>>({})
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [bookingsError, setBookingsError] = useState<string | null>(null)
-  const [actionBookingId, setActionBookingId] = useState<string | null>(null)
 
-  const fetchOwnerBookings = useCallback(async () => {
+  const loadListings = useCallback(async () => {
+    setLoading(true)
     try {
-      const response = await fetch(`${apiUrl}/api/bookings/mine`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}))
-        throw new Error(data.detail || 'Failed to fetch booking requests')
+      const [mineRes, bookingsRes] = await Promise.all([
+        authFetch(`${apiUrl}/api/spaces/mine`),
+        authFetch(`${apiUrl}/api/bookings/mine`),
+      ])
+
+      if (!mineRes.ok) {
+        const data = await mineRes.json().catch(() => ({}))
+        throw new Error(data.detail || 'Failed to fetch your listings')
       }
-      setOwnerBookings(await response.json())
-      setBookingsError(null)
+
+      const summaries = await mineRes.json()
+      setListings(summaries)
+
+      if (bookingsRes.ok) {
+        const bookings: OwnerBooking[] = await bookingsRes.json()
+        setRequestCountBySpace(countBookingsBySpace(bookings))
+      } else {
+        setRequestCountBySpace({})
+      }
+
+      const detailResponses = await Promise.all(
+        summaries.map((s: { id: string }) =>
+          fetch(`${apiUrl}/api/spaces/${s.id}`).then((r) => r.json())
+        )
+      )
+      setFullSpaces(detailResponses)
+      setError(null)
     } catch (err) {
-      setBookingsError(err instanceof Error ? err.message : 'Unknown error')
+      if (err instanceof SessionExpiredError) {
+        router.push('/')
+        return
+      }
+      setError(err instanceof Error ? err.message : 'Unknown error')
     } finally {
-      setBookingsLoading(false)
+      setLoading(false)
     }
-  }, [apiUrl, token])
+  }, [apiUrl, authFetch, router])
 
   useEffect(() => {
-    const fetchListings = async () => {
-      try {
-        const response = await fetch(`${apiUrl}/api/spaces/mine`, {
-          headers: { Authorization: `Bearer ${token}` },
-        })
-        if (!response.ok) {
-          const data = await response.json().catch(() => ({}))
-          throw new Error(data.detail || 'Failed to fetch your listings')
-        }
-        setListings(await response.json())
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Unknown error')
-      } finally {
-        setLoading(false)
-      }
+    if (view === 'listings') {
+      loadListings()
     }
+  }, [view, loadListings])
 
-    if (token) {
-      fetchListings()
-      fetchOwnerBookings()
-    }
-  }, [apiUrl, token, fetchOwnerBookings])
-
-  const handleBookingAction = async (bookingId: string, action: 'approve' | 'reject') => {
-    setActionBookingId(bookingId)
-    try {
-      const response = await fetch(`${apiUrl}/api/bookings/${bookingId}/${action}`, {
-        method: 'PATCH',
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}))
-        throw new Error(data.detail || `Failed to ${action} booking`)
-      }
-      await fetchOwnerBookings()
-    } catch (err) {
-      setBookingsError(err instanceof Error ? err.message : 'Unknown error')
-    } finally {
-      setActionBookingId(null)
-    }
+  const goToListings = () => {
+    setView('listings')
+    router.push('/host?view=listings')
   }
 
-  const pending = ownerBookings.filter((b) => b.status === 'pending')
-  const approved = ownerBookings.filter((b) => b.status === 'approved')
-  const rejected = ownerBookings.filter((b) => b.status === 'rejected')
-
   return (
-    <AppShell mode="host">
-      <div className="flex flex-wrap justify-between items-center gap-4 mb-8">
-        <div>
-          <h1 className="text-2xl font-bold text-dark">My spaces</h1>
-          <p className="text-gray-600 text-sm mt-1">List your space and manage incoming requests</p>
-        </div>
-        <Link href="/spaces/new" className="btn-primary text-sm">
-          Add a space
-        </Link>
-      </div>
+    <AppShell mode="host" variant="minimal">
+      {view === 'intro' ? (
+        <div className="max-w-xl mx-auto">
+          <PageHeader title="My spaces" onBack={() => router.push('/dashboard')} />
 
-      <div className="space-y-6">
-        <div className="card">
-          <h2 className="font-semibold text-dark mb-4">Your listings</h2>
+          <div className="text-center mb-8">
+            <SparkleIcon size={28} className="text-host-cream-accent mx-auto mb-4" />
+            <p className="text-gray-500 text-sm">Ready to share your space with local artists?</p>
+          </div>
+
+          <div className="space-y-6 mb-8">
+            <button type="button" onClick={goToListings} className="btn-host w-full rounded-3xl py-4">
+              View my listings
+            </button>
+
+            <Link href="/spaces/new" className="btn-host-outline w-full block text-center rounded-3xl py-4">
+              Add a space
+            </Link>
+          </div>
+        </div>
+      ) : (
+        <div className="max-w-5xl mx-auto">
+          <PageHeader
+            title="My spaces"
+            onBack={() => {
+              setView('intro')
+              router.push('/host')
+            }}
+            rightAction={
+              <Link
+                href="/spaces/new"
+                className="w-10 h-10 rounded-full bg-host-cream flex items-center justify-center text-host-cream-accent"
+                aria-label="Add a space"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+              </Link>
+            }
+          />
+
           {loading ? (
-            <p className="text-gray-600 text-sm">Loading your listings...</p>
+            <p className="text-gray-600 text-sm text-center py-12">Loading your listings...</p>
           ) : error ? (
-            <p className="text-red-600 text-sm">{error}</p>
+            <p className="text-red-600 text-sm text-center py-12">{error}</p>
           ) : listings.length === 0 ? (
-            <div className="text-center py-6">
-              <p className="text-gray-600 text-sm mb-4">
-                You have not listed any spaces yet. Share your space with the community!
-              </p>
-              <Link href="/spaces/new" className="btn-primary text-sm inline-block">
+            <p className="text-gray-600 text-center py-12">
+              You have not listed any spaces yet.{' '}
+              <Link href="/spaces/new" className="text-host-cream-accent hover:underline">
                 Add your first space
               </Link>
-            </div>
+            </p>
           ) : (
-            <ul className="divide-y divide-gray-200">
-              {listings.map((listing) => (
-                <li key={listing.id} className="py-3 first:pt-0 last:pb-0">
-                  <Link
-                    href={`/spaces/${listing.id}`}
-                    className="block hover:bg-primary-light -mx-2 px-2 rounded-2xl transition-colors"
-                  >
-                    <p className="font-medium text-dark">{listing.name}</p>
-                    <p className="text-sm text-gray-600">{listing.location || 'No location set'}</p>
-                  </Link>
-                </li>
+            <div className="space-y-3 mb-10 max-w-xl mx-auto">
+              {fullSpaces.map((space) => (
+                <SpaceCard
+                  key={space.id}
+                  space={space}
+                  apiUrl={apiUrl}
+                  layout="row"
+                  accent="host"
+                  requestCount={requestCountBySpace[space.id] ?? 0}
+                />
               ))}
-            </ul>
-          )}
-        </div>
-
-        <div className="card">
-          <h2 className="font-semibold text-dark mb-4">Incoming booking requests</h2>
-          {bookingsLoading ? (
-            <p className="text-gray-600 text-sm">Loading booking requests...</p>
-          ) : bookingsError ? (
-            <p className="text-red-600 text-sm">{bookingsError}</p>
-          ) : ownerBookings.length === 0 ? (
-            <p className="text-gray-600 text-sm">No booking requests yet.</p>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <OwnerBookingGroup
-                title="Pending approval"
-                bookings={pending}
-                showActions
-                onApprove={(id) => handleBookingAction(id, 'approve')}
-                onReject={(id) => handleBookingAction(id, 'reject')}
-                actionBookingId={actionBookingId}
-              />
-              <OwnerBookingGroup title="Confirmed" bookings={approved} />
-              <OwnerBookingGroup title="Rejected" bookings={rejected} />
             </div>
           )}
         </div>
-      </div>
+      )}
     </AppShell>
   )
 }

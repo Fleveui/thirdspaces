@@ -6,12 +6,24 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
-import { AppShell } from '@/components/AppShell'
+import {
+  HubActionCard,
+  IncomingRequestsStrip,
+  MyBookingRequestsStrip,
+} from '@/components/HubActionCard'
+import { SparkleIcon } from '@/components/SparkleIcon'
 import { useAuth } from '@/lib/auth'
 
+function displayName(username: string | undefined): string {
+  if (!username) return 'there'
+  return username.charAt(0).toUpperCase() + username.slice(1)
+}
+
 function HubContent() {
-  const { user } = useAuth()
+  const { user, logout } = useAuth()
+  const router = useRouter()
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
   const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null
 
@@ -31,10 +43,12 @@ function HubContent() {
             headers: { Authorization: `Bearer ${token}` },
           }),
         ])
+
         if (hostRes.ok) {
           const data = await hostRes.json()
           setPendingHostCount(data.filter((b: { status: string }) => b.status === 'pending').length)
         }
+
         if (findRes.ok) {
           const data = await findRes.json()
           setPendingFindCount(data.filter((b: { status: string }) => b.status === 'pending').length)
@@ -47,53 +61,56 @@ function HubContent() {
     loadCounts()
   }, [apiUrl, token])
 
+  const handleLogout = () => {
+    logout()
+    router.push('/')
+  }
+
   return (
-    <AppShell mode="hub" showModeNav={false}>
-      <div className="max-w-lg mx-auto text-center mb-10">
-        <h1 className="text-2xl font-bold text-dark mb-2">
-          Welcome back{user?.username ? `, ${user.username}` : ''}!
-        </h1>
-        <p className="text-gray-600 text-sm">What would you like to do today?</p>
-      </div>
+    <div className="min-h-screen bg-white">
+      <div className="max-w-xl mx-auto px-4 py-6">
+        <header className="flex items-start justify-between mb-8">
+          <div>
+            <p className="text-gray-500 text-sm">Welcome back,</p>
+            <h1 className="text-2xl font-bold text-primary flex items-center gap-2">
+              {displayName(user?.username)}
+              <SparkleIcon size={18} className="text-primary" />
+            </h1>
+          </div>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/host/requests"
+              className="relative w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 hover:bg-gray-200"
+              aria-label="Incoming requests"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0" />
+              </svg>
+              {pendingHostCount > 0 && (
+                <span className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-primary border-2 border-white" />
+              )}
+            </Link>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 hover:bg-gray-200"
+              aria-label="Log out"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" />
+              </svg>
+            </button>
+          </div>
+        </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto">
-        <Link
-          href="/find"
-          className="card hover:shadow-md transition-shadow border-2 border-transparent hover:border-primary/30 text-left block"
-        >
-          <h2 className="text-xl font-bold text-primary mb-2">Find a space</h2>
-          <p className="text-gray-600 text-sm mb-4">
-            Browse and book community spaces near you.
-          </p>
-          {pendingFindCount > 0 && (
-            <span className="inline-block text-xs bg-primary-light text-primary px-3 py-1 rounded-full">
-              {pendingFindCount} pending request{pendingFindCount !== 1 ? 's' : ''}
-            </span>
-          )}
-        </Link>
-
-        <Link
-          href="/host"
-          className="card hover:shadow-md transition-shadow border-2 border-transparent hover:border-primary/30 text-left block"
-        >
-          <h2 className="text-xl font-bold text-primary mb-2">My spaces</h2>
-          <p className="text-gray-600 text-sm mb-4">
-            List your space and manage incoming requests.
-          </p>
-          {pendingHostCount > 0 && (
-            <span className="inline-block text-xs bg-primary-light text-primary px-3 py-1 rounded-full">
-              {pendingHostCount} request{pendingHostCount !== 1 ? 's' : ''} to review
-            </span>
-          )}
-        </Link>
+        <div className="space-y-4">
+          <HubActionCard variant="find" href="/find" />
+          <MyBookingRequestsStrip href="/find/requests" count={pendingFindCount} />
+          <HubActionCard variant="host" href="/host" />
+          <IncomingRequestsStrip href="/host/requests" count={pendingHostCount} />
+        </div>
       </div>
-
-      <div className="max-w-3xl mx-auto mt-10 text-center">
-        <Link href="/messages" className="text-primary text-sm hover:underline">
-          Messages
-        </Link>
-      </div>
-    </AppShell>
+    </div>
   )
 }
 

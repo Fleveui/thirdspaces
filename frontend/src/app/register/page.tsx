@@ -9,7 +9,8 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth'
-import { PasswordInput, SparkleIcon } from '@/components/PasswordInput'
+import { PasswordInput } from '@/components/PasswordInput'
+import { SparkleIcon } from '@/components/SparkleIcon'
 
 type AccountType = 'user' | 'space_owner'
 
@@ -101,7 +102,7 @@ export default function RegisterPage() {
 
       <div className="flex-1 w-full max-w-sm mx-auto pb-8">
         <div className="text-center mb-8">
-          <SparkleIcon className="mx-auto mb-4" />
+          <SparkleIcon size={64} className="text-primary mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-primary">Nice to meet you!</h1>
           <p className="text-gray-600 text-sm mt-2">Create your Match for Space account</p>
         </div>
@@ -246,7 +247,7 @@ export default function RegisterPage() {
 
         <div className="mt-6 text-center text-sm text-gray-600">
           Already have an account?{' '}
-          <Link href="/login" className="font-medium text-primary hover:underline">
+          <Link href="/" className="font-medium text-primary hover:underline">
             login
           </Link>
         </div>

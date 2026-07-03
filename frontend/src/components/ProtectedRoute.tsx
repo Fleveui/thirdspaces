@@ -29,7 +29,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   useEffect(() => {
     // Once loading is complete, check if user is logged in
     if (!loading && !user) {
-      router.push('/login')
+      router.push('/')
     }
   }, [user, loading, router])
 

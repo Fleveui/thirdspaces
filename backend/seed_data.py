@@ -4,7 +4,7 @@
 
 from datetime import datetime, timedelta
 from database import SessionLocal
-from models import Space, Booking, BusinessAccount, PersonalAccount, SpacePhoto, User, AccountType
+from models import Space, Booking, PersonalAccount, User, AccountType
 from services.auth import hash_password
 import uuid
 
@@ -15,37 +15,33 @@ def seed_database():
     try:
         # Clear existing data
         db.query(Booking).delete()
-        db.query(SpacePhoto).delete()
         db.query(Space).delete()
-        db.query(BusinessAccount).delete()
         db.query(PersonalAccount).delete()
         db.commit()
         print("✅ Cleared existing data")
         
-        # Create demo business accounts (space owners)
+        # Create demo space owner profiles
         owner1_id = str(uuid.uuid4().hex)
         owner2_id = str(uuid.uuid4().hex)
         
-        owner1 = BusinessAccount(
+        owner1 = PersonalAccount(
             id=owner1_id,
             name="Mark",
             surname="Rossi",
-            company="Sustainable Spaces",
-            company_email="mark@sustainablespaces.com",
+            email="mark@sustainablespaces.com",
             created_at=datetime.utcnow()
         )
-        owner2 = BusinessAccount(
+        owner2 = PersonalAccount(
             id=owner2_id,
             name="Lucy",
             surname="White",
-            company="Community Hub Milan",
-            company_email="lucy@communityhub.com",
+            email="lucy@communityhub.com",
             created_at=datetime.utcnow()
         )
         db.add(owner1)
         db.add(owner2)
         db.commit()
-        print("✅ Created 2 business accounts")
+        print("✅ Created 2 owner profiles")
 
         existing_demo_user = db.query(User).filter(User.username == "demoowner").first()
         if existing_demo_user:
@@ -64,65 +60,45 @@ def seed_database():
         db.commit()
         print("✅ Created demo space owner login (demoowner / secret12)")
         
-        # Create demo spaces
+        # owner1 (demoowner): 3 spaces — visible only in My spaces
+        # owner2: 6 spaces — visible only in Find for demoowner
         spaces_data = [
             {
-                "name": "Bright Loft - Navigli",
+                "name": "Bright Loft - Centro",
                 "owner_id": owner1_id,
                 "area_m2": 120.0,
                 "is_outdoor": False,
-                "category": "Loft",
+                "category": "Workshop",
                 "availability": "Weekends",
                 "deposit_needed": 500.0,
-                "location": "Naviglio Grande, Milan",
-                "description": "Spacious open-plan loft with large windows overlooking the Navigli canals. Ideal for workshops, exhibitions, and community gatherings.",
+                "max_people": 35,
+                "location": "Via Laurin, Bolzano",
+                "description": "Spacious open-plan loft in Bolzano city centre with mountain views. Ideal for workshops, exhibitions, and community gatherings.",
                 "rules": "No smoking. Respect checkout time. Final cleanup is the organizer's responsibility."
             },
             {
-                "name": "Panoramic Terrace - Duomo",
+                "name": "Panoramic Terrace - Walther",
                 "owner_id": owner1_id,
                 "area_m2": 80.0,
                 "is_outdoor": True,
-                "category": "Terrace",
+                "category": "Exhibition",
                 "availability": "Flexible",
                 "deposit_needed": 300.0,
-                "location": "Piazza Duomo, Milan",
-                "description": "Rooftop terrace with views of the Duomo, perfect for outdoor events, drinks, and small performances.",
-                "rules": "Maximum 40 guests. Music until 10:00 PM. No fireworks."
-            },
-            {
-                "name": "Creative Studio - Lambrate",
-                "owner_id": owner2_id,
-                "area_m2": 150.0,
-                "is_outdoor": False,
-                "category": "Studio",
-                "availability": "Weekdays 9-18",
-                "deposit_needed": 400.0,
-                "location": "Via Lambrertesca, Milan",
-                "description": "Creative studio with natural light, work tables, and a lounge area. Suited for classes, artist residencies, and coworking.",
-                "rules": "Shared equipment must be restored after use. Minimum booking of 4 hours."
-            },
-            {
-                "name": "Shared Garden - Porta Romana",
-                "owner_id": owner2_id,
-                "area_m2": 200.0,
-                "is_outdoor": True,
-                "category": "Garden",
-                "availability": "Daily",
-                "deposit_needed": 200.0,
-                "location": "Porta Romana, Milan",
-                "description": "Urban garden with a community allotment, picnic area, and space for outdoor workshops.",
-                "rules": "Respect the allotment plants. Bring bags for waste. Pets on leash only."
+                "max_people": 25,
+                "location": "Piazza Walther, Bolzano",
+                "description": "Rooftop terrace with views of the Dolomites, perfect for outdoor events, drinks, and small performances.",
+                "rules": "Maximum 25 guests. Music until 10:00 PM. No fireworks."
             },
             {
                 "name": "Meeting Room - Central",
                 "owner_id": owner1_id,
                 "area_m2": 60.0,
                 "is_outdoor": False,
-                "category": "Office",
+                "category": "Conference",
                 "availability": "Hourly",
                 "deposit_needed": 150.0,
-                "location": "Via Torino, Milan",
+                "max_people": 15,
+                "location": "Via dei Portici, Bolzano",
                 "description": "Central meeting room with Wi-Fi, projector, and whiteboard. For meetings, training, and small professional events.",
                 "rules": "Free cancellation up to 24 hours before. Return the room in its original condition."
             },
@@ -131,9 +107,10 @@ def seed_database():
                 "owner_id": owner2_id,
                 "area_m2": 95.0,
                 "is_outdoor": False,
-                "category": "Loft",
+                "category": "Workshop",
                 "availability": "Weekends",
                 "deposit_needed": 350.0,
+                "max_people": 30,
                 "location": "Via Laurin, Bolzano",
                 "description": "Bright loft in Bolzano city centre with mountain views. Ideal for workshops, pop-up exhibitions, and small community events.",
                 "rules": "No loud music after 9 PM. Leave the space tidy after use.",
@@ -144,9 +121,10 @@ def seed_database():
                 "owner_id": owner2_id,
                 "area_m2": 70.0,
                 "is_outdoor": True,
-                "category": "Terrazza",
+                "category": "Exhibition",
                 "availability": "Flexible",
                 "deposit_needed": 250.0,
+                "max_people": 25,
                 "location": "Piazza Walther, Bolzano",
                 "description": "Sunny terrace steps from Piazza Walther. Perfect for outdoor meetups, aperitivos, and summer gatherings.",
                 "rules": "Maximum 25 guests. Respect neighbours. No glass bottles on the railing.",
@@ -157,9 +135,10 @@ def seed_database():
                 "owner_id": owner2_id,
                 "area_m2": 110.0,
                 "is_outdoor": False,
-                "category": "Studio",
+                "category": "Crafting",
                 "availability": "Weekdays 10-18",
                 "deposit_needed": 300.0,
+                "max_people": 20,
                 "location": "Via Rafenstein, Bolzano",
                 "description": "Creative studio in Oltrisarco with workbenches, natural light, and a small kitchen. Suited for craft workshops and coworking.",
                 "rules": "Clean tools after use. Book at least 3 hours. No hazardous materials.",
@@ -170,13 +149,40 @@ def seed_database():
                 "owner_id": owner2_id,
                 "area_m2": 180.0,
                 "is_outdoor": True,
-                "category": "Orto",
+                "category": "Physical activity",
                 "availability": "Daily",
                 "deposit_needed": 100.0,
+                "max_people": 40,
                 "location": "Via Europa, Bolzano",
                 "description": "Shared garden plot with picnic tables and a toolshed. Great for gardening workshops, outdoor classes, and community dinners.",
                 "rules": "Compost organic waste on site. Do not disturb planted beds. Dogs on leash.",
                 "exchange_preferences": "Garden maintenance or composting help welcomed."
+            },
+            {
+                "name": "Creative Studio - Gries",
+                "owner_id": owner2_id,
+                "area_m2": 150.0,
+                "is_outdoor": False,
+                "category": "Music",
+                "availability": "Weekdays 9-18",
+                "deposit_needed": 400.0,
+                "max_people": 25,
+                "location": "Via Gries, Bolzano",
+                "description": "Creative studio with natural light, work tables, and a lounge area. Suited for music rehearsals, classes, and artist residencies.",
+                "rules": "Shared equipment must be restored after use. Minimum booking of 4 hours."
+            },
+            {
+                "name": "Shared Garden - Don Bosco",
+                "owner_id": owner2_id,
+                "area_m2": 200.0,
+                "is_outdoor": True,
+                "category": "Physical activity",
+                "availability": "Daily",
+                "deposit_needed": 200.0,
+                "max_people": 50,
+                "location": "Via Don Bosco, Bolzano",
+                "description": "Urban garden with a community allotment, picnic area, and space for outdoor workshops.",
+                "rules": "Respect the allotment plants. Bring bags for waste. Pets on leash only."
             },
         ]
         
@@ -191,14 +197,14 @@ def seed_database():
             created_spaces.append(space)
         
         db.commit()
-        print(f"✅ Created {len(created_spaces)} spaces")
+        print(f"✅ Created {len(created_spaces)} spaces (3 demoowner, 6 other owner)")
         
         # Create demo personal account (borrower)
         borrower = PersonalAccount(
             id=str(uuid.uuid4().hex),
-            name="Alice",
-            surname="Green",
-            email="alice@example.com",
+            name="Lena",
+            surname="Fischer",
+            email="lena@example.com",
             password_hash=None,
             created_at=datetime.utcnow()
         )
@@ -210,8 +216,8 @@ def seed_database():
         owner1_spaces = [space for space in created_spaces if space.owner_id == owner1_id]
         booking_statuses = ["pending", "approved", "rejected"]
         exchange_offers = [
-            "I will host a free community workshop for local residents on sustainable gardening.",
-            "Professional photo coverage and social media promotion for your space.",
+            "I am a visual artist working with large-scale textile installations. I would love to use your loft for a two-week residency and open studio.",
+            "Professional photo coverage and social media promotion for your space in exchange for weekend access.",
             "Weekly garden maintenance and composting support for three months.",
         ]
 
@@ -220,10 +226,11 @@ def seed_database():
                 booking_id=str(uuid.uuid4().hex),
                 space_id=space.id,
                 borrower_id=borrower.id,
-                start_date=datetime.utcnow() + timedelta(days=7 + i),
-                end_date=datetime.utcnow() + timedelta(days=14 + i),
+                start_date=datetime.utcnow() + timedelta(days=7 + i * 7),
+                end_date=datetime.utcnow() + timedelta(days=14 + i * 7),
                 status=booking_statuses[i],
                 exchange_offer=exchange_offers[i],
+                intended_use="Creative residency and community workshop",
                 created_at=datetime.utcnow(),
             )
             db.add(booking)

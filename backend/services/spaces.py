@@ -32,6 +32,7 @@ def space_to_dict(space: Space, db: Session, include_photos: bool = False) -> di
         "description": space.description,
         "rules": space.rules,
         "exchange_preferences": space.exchange_preferences,
+        "max_people": space.max_people,
         "image_url": _first_photo_url(space.id, db),
     }
     if include_photos:
@@ -80,6 +81,7 @@ def create_space(
         rules=getattr(data, "rules", None),
         deposit_needed=getattr(data, "deposit_needed", None),
         exchange_preferences=getattr(data, "exchange_preferences", None),
+        max_people=getattr(data, "max_people", None),
     )
 
     try:
@@ -107,6 +109,8 @@ def search_spaces(
     is_outdoor: Optional[bool] = None,
     min_area: Optional[float] = None,
     max_area: Optional[float] = None,
+    min_people: Optional[int] = None,
+    max_people: Optional[int] = None,
     location: Optional[str] = None,
     availability: Optional[str] = None,
     exclude_owner_id: Optional[str] = None,
@@ -123,6 +127,10 @@ def search_spaces(
         query = query.filter(Space.area_m2 >= min_area)
     if max_area is not None:
         query = query.filter(Space.area_m2 <= max_area)
+    if min_people is not None:
+        query = query.filter(Space.max_people >= min_people)
+    if max_people is not None:
+        query = query.filter(Space.max_people <= max_people)
     if location:
         query = query.filter(Space.location.ilike(f"%{location}%"))
     if availability:

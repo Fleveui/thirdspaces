@@ -3,6 +3,7 @@
 from services.auth import (
     authenticate_user,
     create_access_token,
+    get_or_create_personal_account,
     hash_password,
     register_user,
     verify_password,
@@ -52,7 +53,7 @@ class TestRegisterUser:
         assert profile.email == "alice@example.com"
 
     def test_register_space_owner(self, db):
-        from models import BusinessAccount
+        from models import PersonalAccount
 
         user, error = register_user(
             username="bob",
@@ -64,8 +65,26 @@ class TestRegisterUser:
 
         assert error is None
         assert user.account_type.value == "space_owner"
-        business = db.query(BusinessAccount).filter(BusinessAccount.id == user.id).first()
-        assert business is not None
+        profile = db.query(PersonalAccount).filter(PersonalAccount.id == user.id).first()
+        assert profile is not None
+        assert profile.email == "bob@example.com"
+
+    def test_get_or_create_personal_account_backfills_legacy_user(self, db):
+        from models import User, AccountType
+
+        user = User(
+            username="legacy",
+            email="legacy@example.com",
+            password_hash=hash_password("password123"),
+            account_type=AccountType.SPACE_OWNER,
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
+        profile = get_or_create_personal_account(user, db)
+        assert profile.id == user.id
+        assert profile.email == "legacy@example.com"
 
     def test_register_duplicate_username(self, db):
         register_user("alice", "alice@example.com", "password123", "user", db)

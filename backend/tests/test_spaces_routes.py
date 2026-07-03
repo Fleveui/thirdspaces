@@ -92,6 +92,23 @@ class TestListSpaces:
         assert "Other Host Loft" in names
         assert "Owner Loft" not in names
 
+    def test_list_spaces_filters_by_max_people(self, client, space_owner_token):
+        client.post(
+            "/api/spaces",
+            json=valid_space_payload(name="Small Space", max_people=10),
+            headers=auth_headers(space_owner_token),
+        )
+        client.post(
+            "/api/spaces",
+            json=valid_space_payload(name="Large Space", max_people=50),
+            headers=auth_headers(space_owner_token),
+        )
+
+        response = client.get("/api/spaces?min_people=40")
+        names = [s["name"] for s in response.json()]
+        assert "Large Space" in names
+        assert "Small Space" not in names
+
 
 class TestListMySpaces:
     def test_list_my_spaces_empty(self, client, space_owner_token):

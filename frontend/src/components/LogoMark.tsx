@@ -1,35 +1,57 @@
+type LogoVariant = 'badge' | 'mark'
+
 interface LogoMarkProps {
   size?: number
   className?: string
+  variant?: LogoVariant
 }
 
-export function LogoMark({ size = 120, className = '' }: LogoMarkProps) {
+const LOGO_SRC = '/logo-white.png'
+
+const maskStyle = {
+  WebkitMaskImage: `url('${LOGO_SRC}')`,
+  maskImage: `url('${LOGO_SRC}')`,
+  WebkitMaskSize: 'contain',
+  maskSize: 'contain',
+  WebkitMaskRepeat: 'no-repeat',
+  maskRepeat: 'no-repeat',
+  WebkitMaskPosition: 'center',
+  maskPosition: 'center',
+  WebkitMaskMode: 'luminance',
+  maskMode: 'luminance' as const,
+}
+
+export function LogoMark({ size = 120, className = '', variant = 'mark' }: LogoMarkProps) {
+  if (variant === 'badge') {
+    const iconSize = Math.round(size * 0.52)
+    return (
+      <div
+        className={`rounded-full bg-primary flex items-center justify-center shrink-0 ${className}`}
+        style={{ width: size, height: size }}
+        aria-hidden
+      >
+        {/* mix-blend-screen: white icon on purple circle, black areas show through */}
+        <img
+          src={LOGO_SRC}
+          alt=""
+          width={iconSize}
+          height={iconSize}
+          className="mix-blend-screen"
+          aria-hidden
+        />
+      </div>
+    )
+  }
+
   return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 120 120"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      className={className}
-      aria-hidden="true"
-    >
-      <circle cx="60" cy="60" r="60" fill="#a166ff" />
-      <path
-        d="M38 72V52L60 38L82 52V72H70V58H50V72H38Z"
-        stroke="white"
-        strokeWidth="3"
-        strokeLinejoin="round"
-        fill="none"
-      />
-      <path
-        d="M72 44L76 36L84 40L80 48L72 44Z"
-        fill="white"
-      />
-      <path
-        d="M76 36L78 32L82 34L80 38L76 36Z"
-        fill="white"
-      />
-    </svg>
+    <span
+      aria-hidden
+      className={`inline-block shrink-0 bg-primary ${className}`}
+      style={{
+        width: size,
+        height: size,
+        ...maskStyle,
+      }}
+    />
   )
 }

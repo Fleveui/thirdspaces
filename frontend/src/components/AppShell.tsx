@@ -11,24 +11,40 @@ interface AppShellProps {
   mode: AppMode
   children: ReactNode
   showModeNav?: boolean
+  variant?: 'default' | 'minimal'
 }
 
-export function AppShell({ mode, children, showModeNav = true }: AppShellProps) {
+export function AppShell({
+  mode,
+  children,
+  showModeNav = true,
+  variant = 'default',
+}: AppShellProps) {
   const { logout } = useAuth()
   const router = useRouter()
 
   const handleLogout = () => {
     logout()
-    router.push('/login')
+    router.push('/')
+  }
+
+  const shellBg = variant === 'minimal' ? 'bg-white' : mode === 'host' ? 'bg-host-cream' : 'bg-white'
+
+  if (variant === 'minimal') {
+    return (
+      <div className={`min-h-screen ${shellBg}`}>
+        <main className="max-w-xl mx-auto px-4 py-6">{children}</main>
+      </div>
+    )
   }
 
   return (
-    <div className="min-h-screen bg-white">
-      <header className="bg-white border-b border-gray-100">
+    <div className={`min-h-screen ${shellBg}`}>
+      <header className={`${shellBg} border-b border-gray-100`}>
         <div className="max-w-7xl mx-auto px-4 py-4 flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center">
           <div className="flex items-center gap-3">
             <Link href="/dashboard">
-              <LogoMark size={40} />
+              <LogoMark size={40} variant="mark" />
             </Link>
             <div>
               <Link href="/dashboard" className="text-xl font-bold text-primary hover:opacity-90">

@@ -18,7 +18,10 @@
 
 'use client'
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react'
+import { fetchWithAuth, SessionExpiredError } from '@/lib/api'
+
+export { SessionExpiredError }
 
 interface User {
   id: string
@@ -32,6 +35,7 @@ interface AuthContextType {
   login: (username: string, password: string) => Promise<void>
   register: (username: string, email: string, password: string, accountType: string) => Promise<void>
   logout: () => void
+  authFetch: (url: string, init?: RequestInit) => Promise<Response>
   loading: boolean
   error: string | null
 }
@@ -127,13 +131,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   }
 
-  const logout = () => {
+  const logout = useCallback(() => {
     localStorage.removeItem('auth_token')
     setUser(null)
-  }
+  }, [])
+
+  const authFetch = useCallback(
+    (url: string, init?: RequestInit) => fetchWithAuth(url, init, logout),
+    [logout],
+  )
 
   return (
-    <AuthContext.Provider value={{ user, login, register, logout, loading, error }}>
+    <AuthContext.Provider value={{ user, login, register, logout, authFetch, loading, error }}>
       {children}
     </AuthContext.Provider>
   )

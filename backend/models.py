@@ -4,8 +4,7 @@
 # 
 # Tables:
 #   - users: authentication (login/register) for both account types
-#   - personal_account: individual users looking for spaces
-#   - business_account: space owners (companies/organizations)
+#   - personal_account: user profiles (borrowers and space owners)
 #   - space: available spaces for booking
 #   - booking: booking requests and their status
 #   - space_photo: photos/images of spaces
@@ -60,6 +59,7 @@ class Space(Base):
     description = Column(Text, nullable=True)
     rules = Column(Text, nullable=True)
     exchange_preferences = Column(Text, nullable=True)
+    max_people = Column(Integer, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     
     def __repr__(self):
@@ -67,7 +67,7 @@ class Space(Base):
 
 
 class PersonalAccount(Base):
-    """PersonalAccount model: individual users (borrowers)"""
+    """PersonalAccount model: user profile for booking and display names"""
     __tablename__ = "personal_account"
     __table_args__ = {'extend_existing': True}
     
@@ -80,23 +80,6 @@ class PersonalAccount(Base):
     
     def __repr__(self):
         return f"<PersonalAccount {self.name} {self.surname}>"
-
-
-class BusinessAccount(Base):
-    """BusinessAccount model: space owners (companies/organizations)"""
-    __tablename__ = "business_account"
-    __table_args__ = {'extend_existing': True}
-    
-    id = Column(String, primary_key=True)
-    name = Column(String(100), nullable=False)
-    surname = Column(String(100), nullable=False)
-    company = Column(String(255), nullable=False)
-    company_email = Column(String(100), unique=True, nullable=False, index=True)
-    password_hash = Column(String(255), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    
-    def __repr__(self):
-        return f"<BusinessAccount {self.company}>"
 
 
 class Booking(Base):

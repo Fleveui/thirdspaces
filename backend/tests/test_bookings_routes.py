@@ -3,7 +3,7 @@
 from datetime import datetime, timedelta
 
 from models import Booking, PersonalAccount, Space
-from tests.conftest import auth_headers, register_user
+from tests.conftest import auth_headers, login_user, register_user
 
 
 def valid_space_payload(**overrides):
@@ -276,3 +276,38 @@ class TestCreateBooking:
         )
         assert owner_response.status_code == 200
         assert len(owner_response.json()) == 1
+
+    def test_space_owner_can_create_booking(self, client, space_owner_token):
+        from tests.test_spaces_routes import valid_space_payload
+
+        create_response = client.post(
+            "/api/spaces",
+            json=valid_space_payload(name="Host Loft", location="Bolzano"),
+            headers=auth_headers(space_owner_token),
+        )
+        space_id = create_response.json()["id"]
+
+        register_user(
+            client,
+            username="owner2",
+            email="owner2@example.com",
+            password="secret12",
+            account_type="space_owner",
+        )
+        owner2_token = login_user(client, "owner2", "secret12").json()["token"]
+
+        response = client.post(
+            "/api/bookings",
+            json={
+                "space_id": space_id,
+                "start_date": (datetime.utcnow() + timedelta(days=2)).isoformat(),
+                "end_date": (datetime.utcnow() + timedelta(days=5)).isoformat(),
+                "intended_use": "Weekend workshop",
+                "exchange_offer": "Photo documentation",
+                "accepted_terms": True,
+            },
+            headers=auth_headers(owner2_token),
+        )
+
+        assert response.status_code == 201
+        assert response.json()["status"] == "pending"

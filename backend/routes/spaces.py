@@ -38,6 +38,7 @@ class CreateSpaceRequest(BaseModel):
     rules: Optional[str] = None
     deposit_needed: Optional[float] = None
     exchange_preferences: Optional[str] = None
+    max_people: Optional[int] = Field(None, gt=0)
 
 
 class SpacePhotoItem(BaseModel):
@@ -59,6 +60,7 @@ class SpaceResponse(BaseModel):
     description: Optional[str] = None
     rules: Optional[str] = None
     exchange_preferences: Optional[str] = None
+    max_people: Optional[int] = None
     image_url: Optional[str] = None
     photos: Optional[List[SpacePhotoItem]] = None
 
@@ -101,6 +103,8 @@ def list_spaces(
     is_outdoor: Optional[bool] = None,
     min_area: Optional[float] = None,
     max_area: Optional[float] = None,
+    min_people: Optional[int] = None,
+    max_people: Optional[int] = None,
     location: Optional[str] = None,
     availability: Optional[str] = None,
     user: Optional[User] = Depends(get_optional_user),
@@ -112,6 +116,8 @@ def list_spaces(
         is_outdoor=is_outdoor,
         min_area=min_area,
         max_area=max_area,
+        min_people=min_people,
+        max_people=max_people,
         location=location,
         availability=availability,
         exclude_owner_id=user.id if user else None,

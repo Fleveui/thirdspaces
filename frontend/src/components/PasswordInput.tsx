@@ -53,22 +53,3 @@ export function PasswordInput({
     </div>
   )
 }
-
-export function SparkleIcon({ className = '' }: { className?: string }) {
-  return (
-    <svg
-      width="64"
-      height="64"
-      viewBox="0 0 64 64"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      className={className}
-      aria-hidden="true"
-    >
-      <path
-        d="M32 4L36 24L56 28L36 32L32 52L28 32L8 28L28 24L32 4Z"
-        fill="#a166ff"
-      />
-    </svg>
-  )
-}

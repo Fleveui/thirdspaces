@@ -20,6 +20,13 @@ export interface OwnerBooking {
 
 export type BorrowerBooking = OwnerBooking
 
+export function countBookingsBySpace(bookings: OwnerBooking[]): Record<string, number> {
+  return bookings.reduce<Record<string, number>>((acc, booking) => {
+    acc[booking.space_id] = (acc[booking.space_id] ?? 0) + 1
+    return acc
+  }, {})
+}
+
 export function statusLabel(status: string): string {
   switch (status) {
     case 'pending':

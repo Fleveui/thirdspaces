@@ -42,19 +42,23 @@ thirdspaces/
 │   ├── src/
 │   │   ├── app/
 │   │   │   ├── layout.tsx           — root layout, IBM Plex Sans, AuthProvider
-│   │   │   ├── page.tsx             — landing splash (login / join us)
+│   │   │   ├── page.tsx             — landing splash + inline login (redirects if logged in)
 │   │   │   ├── login/
-│   │   │   │   └── page.tsx         — login form (Match for Space design)
+│   │   │   │   └── page.tsx         — redirects to / (login lives on landing)
 │   │   │   ├── register/
 │   │   │   │   ├── page.tsx         — registration form (terms/privacy)
 │   │   │   │   └── verified/
 │   │   │   │       └── page.tsx     — post-registration confirmation
 │   │   │   ├── dashboard/
-│   │   │   │   └── page.tsx         — home hub (Find a space / My spaces cards)
+│   │   │   │   └── page.tsx         — home hub (Find / My booking requests / List your space / Incoming requests)
 │   │   │   ├── find/
-│   │   │   │   └── page.tsx         — Find mode: search, filters, my booking requests
+│   │   │   │   ├── page.tsx         — Find mode: intro, search, filters, results, my booking requests strip
+│   │   │   │   └── requests/
+│   │   │   │       └── page.tsx     — borrower's outgoing booking requests
 │   │   │   ├── host/
-│   │   │   │   └── page.tsx         — Host mode: listings, incoming requests, add space
+│   │   │   │   ├── page.tsx         — Host mode: intro hub + listings view (?view=listings)
+│   │   │   │   └── requests/
+│   │   │   │       └── page.tsx     — incoming booking requests (approve/reject, cream theme)
 │   │   │   ├── messages/
 │   │   │   │   └── page.tsx         — chat conversations (WebSocket)
 │   │   │   ├── bookings/
@@ -63,21 +67,32 @@ thirdspaces/
 │   │   │   ├── spaces/
 │   │   │   │   ├── page.tsx         — redirects to /find
 │   │   │   │   ├── [id]/
-│   │   │   │   │   └── page.tsx     — space detail + Book Now
+│   │   │   │   │   └── page.tsx     — space detail (find + own-listing host views)
 │   │   │   │   └── new/
-│   │   │   │       └── page.tsx     — list-a-space form
-│   │   │   └── globals.css          — global styles (Tailwind, .btn, .input, .card)
+│   │   │   │       └── page.tsx     — list-a-space form (cream inputs)
+│   │   │   └── globals.css          — global styles (Tailwind, .btn, .input, .card, host cream)
 │   │   ├── components/
 │   │   │   ├── ProtectedRoute.tsx   — wrapper for authenticated pages
-│   │   │   ├── AppShell.tsx         — page shell with header and back links
-│   │   │   ├── ModeNav.tsx          — Find | My spaces header toggle
-│   │   │   ├── BookingGroups.tsx    — three-column booking request layout
-│   │   │   ├── LogoMark.tsx         — purple circle logo (house + sparkle)
+│   │   │   ├── AppShell.tsx         — page shell (full or minimal variant)
+│   │   │   ├── PageHeader.tsx       — back arrow + title (contextual navigation)
+│   │   │   ├── HubActionCard.tsx    — dashboard mode cards + request strips
+│   │   │   ├── SpaceCard.tsx        — listing card/row (find or host accent; request badge on host)
+│   │   │   ├── IncomingRequestCard.tsx — host incoming request card (cream/green/red status)
+│   │   │   ├── MyBookingRequestCard.tsx — borrower booking request card (find accent)
+│   │   │   ├── CategoryChips.tsx    — category selector (find or host variant)
+│   │   │   ├── FilterPanel.tsx      — find-mode filter panel
+│   │   │   ├── SearchBar.tsx        — find-mode search input
+│   │   │   ├── LogoMark.tsx         — logo (badge / mark variants)
+│   │   │   ├── SparkleIcon.tsx      — star/sparkle icon (CSS mask)
+│   │   │   ├── ModeNav.tsx          — Find | My spaces header toggle (legacy full shell)
+│   │   │   ├── BookingGroups.tsx    — three-column booking layout (legacy)
 │   │   │   └── PasswordInput.tsx    — password field with visibility toggle
 │   │   └── lib/
-│   │       ├── auth.tsx             — React Context for authentication state
-│   │       ├── bookings.ts          — booking types, date/status helpers
-│   │       └── spaces.ts            — space types and search helpers
+│   │       ├── auth.tsx             — React Context + authFetch (401 clears session)
+│   │       ├── api.ts               — fetchWithAuth, SessionExpiredError
+│   │       ├── bookings.ts          — booking types, status helpers, countBookingsBySpace
+│   │       ├── spaces.ts            — space types, categories, EXCHANGE_OPTIONS, LISTING_DEFAULTS
+│   │       └── hostNavigation.ts    — hostRequestsHref / hostRequestsBackHref (space_id back nav)
 │   ├── package.json                 — Node dependencies (Next.js, Tailwind, shadcn/ui)
 │   ├── tsconfig.json                — TypeScript configuration
 │   ├── tailwind.config.js           — Tailwind CSS customization
@@ -208,60 +223,74 @@ thirdspaces/
 - App title: Match for Space
 
 **src/components/AppShell.tsx**
-- Shared page shell for Find/Host/task pages
-- Header with `LogoMark`, `ModeNav`, logout
-- Configurable back link (e.g. to `/find` or `/host`)
+- Shared page shell with `mode` (`find` | `host`) and `variant` (`full` | `minimal`)
+- Minimal variant: content only (used with `PageHeader` for back navigation)
+- Full variant: header with `LogoMark`, `ModeNav`, logout
 
-**src/components/ModeNav.tsx**
-- Persistent header toggle: **Find** | **My spaces**
-- Highlights active mode based on current route
+**src/components/PageHeader.tsx**
+- Back arrow button + page title + optional right action
+- Used across find/host task pages for consistent contextual navigation
 
-**src/components/BookingGroups.tsx**
-- Reusable three-column layout for booking requests
-- Groups: Pending Approval, Confirmed, Rejected
-- Used on `/host` and `/find` (my requests)
+**src/components/HubActionCard.tsx**
+- Dashboard mode cards: **Find a space** (purple gradient), **List your space** (cream gradient)
+- Strips: `MyBookingRequestsStrip` (find), `IncomingRequestsStrip` (host cream)
+
+**src/components/SpaceCard.tsx**
+- Listing card (`layout="card"`) or row (`layout="row"`) with `accent` (`find` | `host`)
+- Find row: availability badge (e.g. "Available now")
+- Host row: optional `requestCount` — shows clickable request badge linking to `/host/requests?space_id={id}` instead of availability badge
+
+**src/components/IncomingRequestCard.tsx**
+- Host incoming request card on `/host/requests`
+- Cream avatar and pending badge; confirmed (green) / rejected (red) status and card outlines
+- Accept (`btn-host`) / Reject (`btn-host-outline`) on pending requests
 
 **src/app/dashboard/page.tsx**
 - Protected route (requires authentication)
-- Home hub with two mode cards: Find a space → `/find`, My spaces → `/host`
-- Optional badges for pending counts
+- Home hub: Find a space, My booking requests strip, List your space, Incoming requests strip
+- Bell icon links to `/host/requests`; optional pending count badges
 
 **src/app/find/page.tsx**
-- Find mode: search and filter spaces
-- Sends `Authorization` header so own listings are excluded
-- "My booking requests" section via `BookingGroups`
+- Find mode: intro hub + results view (mirrors host layout)
+- Search, category chips, filters; own listings excluded when authenticated
+- My booking requests strip links to `/find/requests`
+
+**src/app/find/requests/page.tsx**
+- Borrower's outgoing booking requests (`GET /api/bookings/my-requests`)
 
 **src/app/host/page.tsx**
-- Host mode: your listings, incoming booking requests
-- "Add a space" CTA → `/spaces/new`
-- Uses `AppShell` + `ModeNav`
+- Host mode: intro hub (`/host`) and listings view (`/host?view=listings`)
+- Fetches `GET /api/spaces/mine` + `GET /api/bookings/mine` for per-space request counts
+- `SpaceCard` rows with request badges; back from listings → intro; back from intro → dashboard
 
-**src/app/messages/page.tsx**
-- Chat UI: conversation list and WebSocket messaging per booking
+**src/app/host/requests/page.tsx**
+- Dedicated incoming requests page (pending / confirmed / rejected sections)
+- Contextual back: `space_id` query param → `/spaces/{id}`; no param → `/dashboard`
 
-**src/app/register/verified/page.tsx**
-- Post-registration confirmation screen
+**src/lib/hostNavigation.ts**
+- `hostRequestsHref(spaceId?)` — builds `/host/requests` or `/host/requests?space_id={id}`
+- `hostRequestsBackHref(spaceId)` — resolves back target for requests page
 
 **src/lib/spaces.ts**
 - TypeScript types for space API responses
-- Search/filter helpers for Find mode
+- `SPACE_CATEGORIES`, `EXCHANGE_OPTIONS`, `LISTING_DEFAULTS` (shared with list + detail forms)
+- Search/filter helpers and `availabilityBadge` for find listings
 
 **src/lib/bookings.ts**
 - TypeScript types for booking API responses
-- Helpers: `statusLabel`, `formatDate`, `formatDateRange`, `exchangeOfferPreview`
+- Helpers: `statusLabel`, `formatDate`, `formatDateRange`, `exchangeOfferPreview`, `countBookingsBySpace`
 
-**src/app/bookings/[id]/page.tsx**
-- Protected route for owner or borrower
-- Approve/reject (owner), contract signing (both), ratings (after visit)
+**src/lib/api.ts** / **src/lib/auth.tsx**
+- `fetchWithAuth` / `authFetch` — attaches Bearer token; 401 clears session (`SessionExpiredError`)
 
 **src/app/spaces/[id]/page.tsx**
-- Space detail with description, rules, exchange_preferences, photos
-- Book Now form for authenticated users
-- Uses `AppShell` with back link to `/find`
+- Space detail with all list-a-space fields, photo placeholder, exchange preference options
+- **Find view** (not owner): lavender accents, availability badge, Book Now form, back → `/find`
+- **Own listing** (owner): host cream accents, request strip above photo (links to `/host/requests?space_id={id}`), no availability badge, back → `/host?view=listings`
 
 **src/app/spaces/new/page.tsx**
 - Protected route for any logged-in user
-- Form to create a listing (`POST /api/spaces`)
+- Cream-themed form (`input-cream`, `btn-host`, `CategoryChips variant="host"`)
 - On success: redirects to `/host`
 
 **src/app/spaces/page.tsx**
@@ -273,15 +302,14 @@ thirdspaces/
 - Redirects to /login if not authenticated
 
 **src/app/page.tsx**
-- Landing splash (/)
-- Shows logo, **Match for Space** title, **login** and **join us!** buttons
-- If logged in: redirects to `/dashboard`
+- Landing splash (/) with inline login form and **join us!** link
+- `/login` redirects here; if logged in → `/dashboard`
 
 **src/lib/auth.tsx**
 - React Context for authentication state management
-- `AuthProvider` component manages login state and token persistence
-- `useAuth()` hook provides: user, login(), register(), logout(), loading, error
-- Stores JWT token in localStorage (see DECISIONS.md #5)
+- `AuthProvider` manages login state and token persistence
+- `useAuth()` provides: user, login(), register(), logout(), **authFetch()**, loading, error
+- Stores JWT token in localStorage; 401 responses clear session
 
 ### Docker & Orchestration
 
@@ -320,25 +348,43 @@ thirdspaces/
 
 ## Data Flow: Host Mode
 
-1. User chooses **My spaces** on hub → **/host**
-2. `GET /api/spaces/mine` → listings with links to `/spaces/{id}`
-3. `GET /api/bookings/mine` → **BookingGroups** (pending / confirmed / rejected)
-4. Add a space → **/spaces/new** → `POST /api/spaces` → back to `/host`
+1. User chooses **List your space** on hub → **/host** (intro: View my listings, Add a space)
+2. **View my listings** → `/host?view=listings`
+3. `GET /api/spaces/mine` + `GET /api/bookings/mine` → listing rows with per-space request count badges
+4. Click listing → **/spaces/{id}** (own-listing detail: all form fields, request strip, back → listings)
+5. Click request badge or strip → **/host/requests?space_id={id}** (back → that space detail)
+6. Dashboard **Incoming requests** strip → **/host/requests** (back → dashboard)
+7. Add a space → **/spaces/new** → `POST /api/spaces` → back to `/host`
 
 ## Data Flow: Booking Lifecycle
 
 1. Borrower books from space detail → status `pending`
-2. Owner approves on `/host` or `/bookings/{id}` → `PATCH approve`
+2. Owner reviews on **/host/requests** or **/bookings/{id}** → `PATCH approve|reject`
 3. Both sign contract on `/bookings/{id}` → `PATCH sign`
 4. After visit → `POST /api/bookings/{id}/rate`
 5. Chat available at `/messages` via WebSocket
 
+## Contextual Back Navigation (Host)
+
+| Page | Entry | Back arrow |
+|------|-------|------------|
+| `/host` (intro) | Dashboard | `/dashboard` |
+| `/host?view=listings` | View my listings | `/host` (intro) |
+| `/spaces/{id}` (own) | My listings | `/host?view=listings` |
+| `/host/requests` | Dashboard strip/bell | `/dashboard` |
+| `/host/requests?space_id={id}` | Listing badge or detail strip | `/spaces/{id}` |
+
+Implemented in `frontend/src/lib/hostNavigation.ts` via `space_id` query parameter.
+
 ## Current Phase
 
 **Implemented:**
-- **Match for Space UI** — purple `#a166ff`, IBM Plex Sans, landing splash, redesigned login/register
-- **Find/Host split** — `/dashboard` hub, `/find`, `/host`, `ModeNav`, `AppShell`
-- Authentication with linked account records and `/register/verified`
+- **Match for Space UI** — purple find theme (`#a166ff`), host cream theme (`#f7d58f`), IBM Plex Sans, landing login
+- **Find/Host split** — `/dashboard` hub with request strips, `/find` (intro + results), `/host` (intro + `?view=listings`), `/host/requests`, `/find/requests`
+- **Contextual navigation** — `PageHeader` back arrows; `hostNavigation.ts` for incoming-requests back via `space_id`
+- **Space detail** — full list-a-space fields, photo placeholder, owner vs find accents
+- **Host listing badges** — per-space booking request counts (replaces "Available now" on My spaces)
+- Authentication with linked account records, `authFetch`, session expiry handling
 - Space search with filters; own listings excluded when authenticated
 - Create listing, photo upload, `exchange_preferences`
 - Full booking lifecycle: request, approve/reject, contracts, ratings

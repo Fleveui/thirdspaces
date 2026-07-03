@@ -37,7 +37,7 @@ export function ModeNav({ active }: ModeNavProps) {
         className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
           active === 'host'
             ? 'bg-primary text-white'
-            : 'text-primary hover:bg-primary-light'
+            : 'text-primary hover:bg-host-cream'
         }`}
       >
         My spaces

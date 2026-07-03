@@ -7,7 +7,7 @@
 import { useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { SparkleIcon } from '@/components/PasswordInput'
+import { SparkleIcon } from '@/components/SparkleIcon'
 
 export default function RegisterVerifiedPage() {
   const router = useRouter()
@@ -21,7 +21,7 @@ export default function RegisterVerifiedPage() {
 
   return (
     <div className="min-h-screen bg-white flex flex-col items-center justify-center px-6">
-      <SparkleIcon className="mb-6" />
+      <SparkleIcon size={64} className="text-primary mb-6" />
       <h1 className="text-2xl font-bold text-primary text-center mb-3">
         Account created — you&apos;re verified!
       </h1>

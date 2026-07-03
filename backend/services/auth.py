@@ -8,7 +8,7 @@ from typing import Optional, Tuple
 import jwt
 import bcrypt
 from sqlalchemy.orm import Session
-from models import User, AccountType, PersonalAccount, BusinessAccount
+from models import User, AccountType, PersonalAccount
 import config
 
 def hash_password(password: str) -> str:
@@ -55,6 +55,25 @@ def verify_token(token: str) -> Optional[str]:
         return None
     except jwt.InvalidTokenError:
         return None
+
+def get_or_create_personal_account(user: User, db: Session) -> PersonalAccount:
+    """Return linked PersonalAccount, creating one from User if missing (legacy accounts)."""
+    profile = db.query(PersonalAccount).filter(PersonalAccount.id == user.id).first()
+    if profile:
+        return profile
+
+    profile = PersonalAccount(
+        id=user.id,
+        name=user.username,
+        surname="",
+        email=user.email,
+        password_hash=user.password_hash,
+    )
+    db.add(profile)
+    db.commit()
+    db.refresh(profile)
+    return profile
+
 
 def register_user(username: str, email: str, password: str, account_type: str, db: Session) -> Tuple[Optional[User], Optional[str]]:
     """
@@ -106,25 +125,14 @@ def register_user(username: str, email: str, password: str, account_type: str, d
         db.add(new_user)
         db.flush()
 
-        if acc_type == AccountType.USER:
-            personal = PersonalAccount(
-                id=new_user.id,
-                name=username,
-                surname="",
-                email=email,
-                password_hash=password_hash,
-            )
-            db.add(personal)
-        else:
-            business = BusinessAccount(
-                id=new_user.id,
-                name=username,
-                surname="",
-                company=username,
-                company_email=email,
-                password_hash=password_hash,
-            )
-            db.add(business)
+        personal = PersonalAccount(
+            id=new_user.id,
+            name=username,
+            surname="",
+            email=email,
+            password_hash=password_hash,
+        )
+        db.add(personal)
 
         db.commit()
         db.refresh(new_user)

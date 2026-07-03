@@ -6,8 +6,7 @@
 # Usage: python3 import_excel.py
 #
 # This script reads the Excel file structure:
-#   - personal account → personal_account table
-#   - buissiness account → business_account table
+#   - personal account + buissiness account → personal_account table
 #   - space → spaces table
 #   - Booking → booking table
 #   - item photo → space_photo table
@@ -20,7 +19,7 @@ import os
 from datetime import datetime
 from sqlalchemy.orm import Session
 from models import (
-    Base, PersonalAccount, BusinessAccount, Space, Booking, SpacePhoto
+    Base, PersonalAccount, Space, Booking, SpacePhoto
 )
 from database import engine, SessionLocal
 import config
@@ -67,12 +66,12 @@ def import_personal_accounts(db: Session):
 
 def import_business_accounts(db: Session):
     """
-    Import business accounts from Excel sheet 'buissiness account'
-    
+    Import business accounts from Excel sheet 'buissiness account' into personal_account.
+
     Excel columns: ID, NAME, SURNAME, COMPANY, COMPANY E-MAIL
-    Maps to: BusinessAccount table
+    Company name is ignored; COMPANY E-MAIL maps to email.
     """
-    print("📥 Importing business accounts...")
+    print("📥 Importing business accounts (as personal profiles)...")
     df = pd.read_excel(EXCEL_FILE, sheet_name="buissiness account")
     
     if df.empty:
@@ -84,12 +83,11 @@ def import_business_accounts(db: Session):
         if pd.isna(row.get('ID')):
             continue
         
-        account = BusinessAccount(
+        account = PersonalAccount(
             id=str(row['ID']),
             name=str(row.get('NAME', '')).strip(),
             surname=str(row.get('SURNAME', '')).strip(),
-            company=str(row.get('COMPANY', '')).strip(),
-            company_email=str(row.get('COMPANY E-MAIL', '')).strip(),
+            email=str(row.get('COMPANY E-MAIL', '')).strip(),
             password_hash=None,
             created_at=datetime.utcnow()
         )
@@ -97,7 +95,7 @@ def import_business_accounts(db: Session):
         count += 1
     
     db.commit()
-    print(f"   ✅ Imported {count} business accounts")
+    print(f"   ✅ Imported {count} business profiles")
 
 def import_spaces(db: Session):
     """
@@ -218,7 +216,6 @@ def clear_database(db: Session):
         db.query(Booking).delete()
         db.query(Space).delete()
         db.query(PersonalAccount).delete()
-        db.query(BusinessAccount).delete()
         db.commit()
         print("   ✅ Database cleared")
     except Exception as e:

@@ -59,20 +59,27 @@ chmod +x start.sh stop.sh  # Make scripts executable (first time only)
 
 ### 4. Test the app
 
-1. **Landing:** Open http://localhost:3000 — splash screen with **login** and **join us!**
+1. **Landing:** Open http://localhost:3000 — splash with inline **login** and **join us!** (`/login` redirects here)
 2. **Register:** Click **join us!**, fill in the form, select account type
 3. **Log in:** Use your credentials (or seed user `demoowner` / `secret12` after running `python3 seed_data.py` in `backend/`)
-4. **Home hub:** After login you land on `/dashboard` — choose **Find a space** or **My spaces**
-5. **Find mode (`/find`):** Browse spaces in Bolzano (and elsewhere) — your own listings are hidden here; filter and book
-6. **Host mode (`/host`):** Manage listings, review incoming requests, add new spaces
-7. **Book → approve → sign → chat:** Book from a space detail page; owner approves on `/host`; both sign on booking detail; chat at `/messages`
+4. **Home hub:** After login you land on `/dashboard` — **Find a space**, **My booking requests**, **List your space**, and **Incoming requests** strips
+5. **Find mode (`/find`):** Intro → **Browse all spaces** for results. Purple theme. Own listings hidden from search. **My booking requests** at `/find/requests`
+6. **Host mode (`/host`):** Intro → **View my listings** (`/host?view=listings`). Cream theme. Listing rows show booking request badges (not "Available now"). **Incoming requests** at `/host/requests`
+7. **Own listing detail:** From My spaces → open a listing. Shows all list-a-space fields, photo placeholder, request strip above photo. Back → listings view
+8. **List a space (`/spaces/new`):** Cream chip-based form with exchange preferences
+9. **Book → approve → sign → chat:** Book from a space detail page; owner approves on `/host/requests`; both sign on booking detail; chat at `/messages`
+
+**Navigation tips (host):**
+- Dashboard → Incoming requests → back goes to **dashboard**
+- My spaces → listing → request badge or detail strip → Incoming requests → back goes to **that space's detail page**
+- My spaces → listing detail → back goes to **View my listings**
 
 **Demo data (optional):**
 ```bash
 cd backend
 python3 seed_data.py
 ```
-Then log in as `demoowner` / `secret12` to see sample spaces and bookings. Find mode shows Bolzano spaces from other owners (not your own listings).
+Then log in as `demoowner` / `secret12`. **Find** shows 6 spaces (owner2, all Bolzano). **My spaces** shows 3 spaces (demoowner only). No overlap between the two modes.
 
 ### 5. Stop the system
 
@@ -88,10 +95,14 @@ When done, press `Ctrl + C` in Terminal, or in a new Terminal window run:
 
 | What | URL | Purpose |
 |------|-----|---------|
-| App | http://localhost:3000 | The web interface |
-| Home hub | http://localhost:3000/dashboard | Choose Find a space or My spaces |
+| App | http://localhost:3000 | Landing + login |
+| Home hub | http://localhost:3000/dashboard | Find a space, booking strips, List your space |
 | Find mode | http://localhost:3000/find | Browse and book spaces (own listings hidden) |
-| Host mode | http://localhost:3000/host | Manage listings and incoming requests |
+| My booking requests | http://localhost:3000/find/requests | Borrower's outgoing requests |
+| Host mode | http://localhost:3000/host | My spaces intro hub |
+| My listings | http://localhost:3000/host?view=listings | Your space listing rows |
+| Incoming requests | http://localhost:3000/host/requests | Review and approve booking requests |
+| List a space | http://localhost:3000/spaces/new | Create a new listing |
 | Messages | http://localhost:3000/messages | Chat with booking partners |
 | API | http://localhost:8000 | Backend server |
 | API Docs | http://localhost:8000/docs | Interactive API documentation (Swagger) |
@@ -154,7 +165,8 @@ Do not run `npm run build` while `npm run dev` is running.
 **Where should I look to understand...?**
 
 - **How login works?** → `ARCHITECTURE.md` (Data Flow section) + `frontend/src/lib/auth.tsx`
-- **Find vs Host modes?** → `ARCHITECTURE.md` (Home Hub and Find/Host Modes) + `frontend/src/components/ModeNav.tsx`
+- **Find vs Host modes?** → `ARCHITECTURE.md` (Home Hub and Find/Host Modes) + `frontend/src/components/HubActionCard.tsx`
+- **Back navigation in host flow?** → `frontend/src/lib/hostNavigation.ts` + `STRUCTURE.md` (Contextual Back Navigation)
 - **Where user data is stored?** → `backend/models.py` (User table definition)
 - **How passwords are secured?** → `backend/services/auth.py` (bcrypt hashing)
 - **What files are where?** → `STRUCTURE.md` (complete file tree)
@@ -194,14 +206,24 @@ pytest
 
 ### UI and branding
 
-The frontend is branded **Match for Space**:
+The frontend is branded **Match for Space** with two accent themes:
 
-- Primary color: `#a166ff`
+**Find (borrower) — purple**
+- Primary: `#a166ff`
+- Inputs: `input-lavender`, buttons: `btn-primary`
+- Used on `/find`, `/find/requests`, and space detail when browsing others' listings
+
+**Host (owner) — cream**
+- Base: `#f7d58f` (`host-cream`), accent text: `#8b6018`
+- Inputs: `input-cream`, buttons: `btn-host` / `btn-host-outline`
+- Used on `/host`, `/host/requests`, `/spaces/new`, and own-listing detail views
+
+Shared:
 - Font: IBM Plex Sans (via `next/font/google`)
-- Design tokens and shared classes: `frontend/tailwind.config.js`, `frontend/src/app/globals.css`
-- Landing splash at `/`, redesigned `/login` and `/register`
+- Design tokens: `frontend/tailwind.config.js`, `frontend/src/app/globals.css`
+- Landing login at `/`; hub strips for booking request counts
 
-See `ARCHITECTURE.md` (Frontend Design System section) for details.
+See `ARCHITECTURE.md` (Frontend Design System section) for component and route details.
 
 ### Stopping development servers
 - Backend: Press `Ctrl + C` in the backend terminal

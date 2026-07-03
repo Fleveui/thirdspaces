@@ -81,7 +81,7 @@ def submit_booking(
     db: Session = Depends(get_db),
 ):
     booking, error = create_booking(
-        borrower_id=user.id,
+        user=user,
         space_id=request.space_id,
         start_date=request.start_date,
         end_date=request.end_date,

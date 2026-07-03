@@ -6,7 +6,8 @@ from typing import List, Optional, Tuple
 import uuid
 from sqlalchemy.orm import Session
 
-from models import Booking, Space, PersonalAccount, Rating
+from models import Booking, Space, PersonalAccount, Rating, User
+from services.auth import get_or_create_personal_account
 
 
 def _format_borrower_name(borrower: Optional[PersonalAccount]) -> str:
@@ -121,7 +122,7 @@ def get_booking_for_user(booking_id: str, user_id: str, db: Session) -> Optional
 
 
 def create_booking(
-    borrower_id: str,
+    user: User,
     space_id: str,
     start_date: datetime,
     end_date: datetime,
@@ -140,17 +141,15 @@ def create_booking(
     if not space:
         return None, "Space not found"
 
-    borrower = db.query(PersonalAccount).filter(PersonalAccount.id == borrower_id).first()
-    if not borrower:
-        return None, "Borrower profile not found"
+    borrower = get_or_create_personal_account(user, db)
 
-    if space.owner_id == borrower_id:
+    if space.owner_id == user.id:
         return None, "You cannot book your own space"
 
     booking = Booking(
         booking_id=uuid.uuid4().hex,
         space_id=space_id,
-        borrower_id=borrower_id,
+        borrower_id=user.id,
         start_date=start_date,
         end_date=end_date,
         intended_use=intended_use.strip(),
