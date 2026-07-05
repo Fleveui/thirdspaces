@@ -13,7 +13,6 @@ def valid_space_payload(**overrides):
         "availability": "Flexible",
         "description": "Great space",
         "rules": "Be respectful",
-        "deposit_needed": 300.0,
     }
     payload.update(overrides)
     return payload

@@ -24,6 +24,7 @@ import {
   LISTING_DEFAULTS,
   SPACE_CATEGORIES,
 } from '@/lib/spaces'
+import { accentClasses } from '@/lib/theme'
 
 function displayText(value: string | null, fallback: string): string {
   return value?.trim() ? value : fallback
@@ -31,11 +32,6 @@ function displayText(value: string | null, fallback: string): string {
 
 function panelClass() {
   return 'rounded-3xl border border-gray-100 bg-white shadow-sm p-5'
-}
-
-function formatDeposit(deposit: number | null): string {
-  if (deposit == null || deposit === 0) return 'Not required'
-  return `€${deposit.toFixed(2)}`
 }
 
 function DetailField({ label, children }: { label: string; children: React.ReactNode }) {
@@ -60,12 +56,13 @@ function ExchangePreferencesList({
   accent: 'find' | 'host'
 }) {
   const selectedSet = new Set(selected)
+  const theme = accentClasses(accent)
   const options = [
     ...EXCHANGE_OPTIONS,
     ...selected.filter((item) => !EXCHANGE_OPTIONS.includes(item as (typeof EXCHANGE_OPTIONS)[number])),
   ]
-  const selectedBorder = accent === 'host' ? 'border-host-cream bg-host-cream-light/40' : 'border-primary bg-primary-light/40'
-  const selectedDot = accent === 'host' ? 'border-host-cream bg-host-cream' : 'border-primary bg-primary'
+  const selectedBorder = theme.selectedBorder
+  const selectedDot = theme.selectedDot
   const unselectedBorder = 'border-gray-200'
 
   return (
@@ -249,25 +246,8 @@ function SpaceDetailContent() {
   const isOwnSpace = Boolean(user && space && user.id === space.owner_id)
   const shellMode = isOwnSpace ? 'host' : 'find'
   const accent = isOwnSpace ? 'host' : 'find'
+  const theme = accentClasses(accent)
   const backHref = isOwnSpace ? '/host?view=listings' : '/find'
-
-  const imageBg = accent === 'host' ? 'bg-host-cream' : 'bg-primary-light'
-  const placeholderText = accent === 'host' ? 'text-host-cream-accent/50' : 'text-primary/50'
-  const categoryBadge =
-    accent === 'host'
-      ? 'bg-host-cream/60 text-host-cream-accent'
-      : 'bg-primary-light text-primary'
-  const inputClass = accent === 'host' ? 'input-cream' : 'input-lavender'
-  const primaryBtnClass =
-    accent === 'host' ? 'btn-host w-full rounded-3xl py-4' : 'btn-primary w-full rounded-3xl py-4'
-  const checkboxAccent = accent === 'host' ? 'accent-host-cream' : 'accent-primary'
-  const successBannerClass =
-    accent === 'host'
-      ? 'mt-8 p-4 rounded-2xl bg-host-cream-light/40'
-      : 'mt-8 p-4 rounded-2xl bg-primary-light/40'
-  const successTitleClass = accent === 'host' ? 'font-medium text-dark' : 'font-medium text-primary'
-  const linkClass =
-    accent === 'host' ? 'text-host-cream-accent hover:underline' : 'text-primary hover:underline'
 
   const pageTitle = loading ? 'Space details' : notFound ? 'Not found' : space?.name ?? 'Space details'
   const badge = space ? availabilityBadge(space.availability) : null
@@ -303,7 +283,7 @@ function SpaceDetailContent() {
             {isOwnSpace && requestCount > 0 && (
               <Link
                 href={hostRequestsHref(id)}
-                className="flex items-center justify-center gap-2 w-full mb-4 py-3 rounded-2xl bg-host-cream/60 border border-host-cream-accent/25 text-dark text-sm font-medium hover:bg-host-cream transition-colors"
+                className={`flex items-center justify-center gap-2 w-full mb-4 py-3 rounded-2xl text-dark text-sm font-medium transition-colors ${theme.stripBg}`}
               >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-host-cream-accent shrink-0">
                   <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
@@ -320,12 +300,12 @@ function SpaceDetailContent() {
                 {photos.map((photo) => {
                   const src = resolveImageUrl(photo.image_url, apiUrl)
                   return (
-                    <div key={photo.photo_id} className={`h-36 ${imageBg} rounded-2xl overflow-hidden`}>
+                    <div key={photo.photo_id} className={`h-36 ${theme.imageBg} rounded-2xl overflow-hidden`}>
                       {src ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={src} alt={space.name} className="w-full h-full object-cover" />
                       ) : (
-                        <div className={`h-full flex flex-col items-center justify-center ${placeholderText}`}>
+                        <div className={`h-full flex flex-col items-center justify-center ${theme.placeholderText}`}>
                           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                             <rect x="3" y="5" width="18" height="14" rx="2" />
                             <circle cx="8.5" cy="10" r="1.5" fill="currentColor" stroke="none" />
@@ -340,7 +320,7 @@ function SpaceDetailContent() {
               </div>
             ) : (
               <div
-                className={`h-48 ${imageBg} rounded-3xl flex flex-col items-center justify-center mb-6 ${placeholderText}`}
+                className={`h-48 ${theme.imageBg} rounded-3xl flex flex-col items-center justify-center mb-6 ${theme.placeholderText}`}
               >
                 <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                   <rect x="3" y="5" width="18" height="14" rx="2" />
@@ -373,7 +353,7 @@ function SpaceDetailContent() {
 
                 <DetailField label="Category">
                   {space.category ? (
-                    <span className={`inline-block text-xs font-medium px-2.5 py-1 rounded-full ${categoryBadge}`}>
+                    <span className={`inline-block text-xs font-medium px-2.5 py-1 rounded-full ${theme.categoryBadge}`}>
                       {space.category}
                     </span>
                   ) : (
@@ -407,9 +387,6 @@ function SpaceDetailContent() {
                   />
                 </DetailField>
 
-                <DetailField label="Deposit needed">
-                  {formatDeposit(space.deposit_needed)}
-                </DetailField>
               </div>
 
               {badge && !isOwnSpace && (
@@ -430,18 +407,18 @@ function SpaceDetailContent() {
                 <button
                   type="button"
                   onClick={() => setShowBookForm((v) => !v)}
-                  className={`${primaryBtnClass} mt-8 disabled:opacity-50`}
+                  className={`${theme.primaryBtn} mt-8 disabled:opacity-50`}
                 >
                   Book Now
                 </button>
               )}
 
               {bookSuccess && (
-                <div className={successBannerClass}>
-                  <p className={successTitleClass}>Pending Approval</p>
+                <div className={theme.successBanner}>
+                  <p className={theme.successTitle}>Pending Approval</p>
                   <p className="text-sm text-gray-600 mt-1">
                     Your booking request was sent. Track it on{' '}
-                    <Link href="/find" className={linkClass}>
+                    <Link href="/find" className={theme.link}>
                       Find a space
                     </Link>
                     .
@@ -459,21 +436,21 @@ function SpaceDetailContent() {
                     required
                     value={bookForm.start_date}
                     onChange={(e) => setBookForm((f) => ({ ...f, start_date: e.target.value }))}
-                    className={inputClass}
+                    className={theme.inputClass}
                   />
                   <input
                     type="date"
                     required
                     value={bookForm.end_date}
                     onChange={(e) => setBookForm((f) => ({ ...f, end_date: e.target.value }))}
-                    className={inputClass}
+                    className={theme.inputClass}
                   />
                   <textarea
                     required
                     placeholder="Intended use"
                     value={bookForm.intended_use}
                     onChange={(e) => setBookForm((f) => ({ ...f, intended_use: e.target.value }))}
-                    className={`${inputClass} resize-y`}
+                    className={`${theme.inputClass} resize-y`}
                     rows={2}
                   />
                   {space.exchange_preferences && (
@@ -481,7 +458,7 @@ function SpaceDetailContent() {
                       placeholder="What you offer in exchange (optional)"
                       value={bookForm.exchange_offer}
                       onChange={(e) => setBookForm((f) => ({ ...f, exchange_offer: e.target.value }))}
-                      className={`${inputClass} resize-y`}
+                      className={`${theme.inputClass} resize-y`}
                       rows={2}
                     />
                   )}
@@ -490,7 +467,7 @@ function SpaceDetailContent() {
                       type="checkbox"
                       checked={bookForm.accepted_terms}
                       onChange={(e) => setBookForm((f) => ({ ...f, accepted_terms: e.target.checked }))}
-                      className={`${checkboxAccent} mt-1`}
+                      className={`${theme.checkboxAccent} mt-1`}
                     />
                     I accept the terms and conditions
                   </label>
@@ -499,7 +476,7 @@ function SpaceDetailContent() {
                       type="checkbox"
                       checked={bookForm.accepted_safety}
                       onChange={(e) => setBookForm((f) => ({ ...f, accepted_safety: e.target.checked }))}
-                      className={`${checkboxAccent} mt-1`}
+                      className={`${theme.checkboxAccent} mt-1`}
                     />
                     I accept the safety agreements
                   </label>
@@ -508,12 +485,12 @@ function SpaceDetailContent() {
                       type="checkbox"
                       checked={bookForm.accepted_privacy}
                       onChange={(e) => setBookForm((f) => ({ ...f, accepted_privacy: e.target.checked }))}
-                      className={`${checkboxAccent} mt-1`}
+                      className={`${theme.checkboxAccent} mt-1`}
                     />
                     I accept the privacy policy
                   </label>
                   {bookError && <p className="error-text">{bookError}</p>}
-                  <button type="submit" disabled={submitting} className={`${primaryBtnClass} disabled:opacity-50`}>
+                  <button type="submit" disabled={submitting} className={`${theme.primaryBtn} disabled:opacity-50`}>
                     {submitting ? 'Sending...' : 'Send booking request'}
                   </button>
                 </form>

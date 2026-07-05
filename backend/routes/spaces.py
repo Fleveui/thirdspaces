@@ -36,7 +36,6 @@ class CreateSpaceRequest(BaseModel):
     availability: Optional[str] = None
     description: Optional[str] = None
     rules: Optional[str] = None
-    deposit_needed: Optional[float] = None
     exchange_preferences: Optional[str] = None
     max_people: Optional[int] = Field(None, gt=0)
 
@@ -55,7 +54,6 @@ class SpaceResponse(BaseModel):
     is_outdoor: Optional[bool] = None
     category: Optional[str] = None
     availability: Optional[str] = None
-    deposit_needed: Optional[float] = None
     location: Optional[str] = None
     description: Optional[str] = None
     rules: Optional[str] = None

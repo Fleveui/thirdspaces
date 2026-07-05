@@ -74,6 +74,10 @@ export function contractFullySigned(
   return Boolean(borrowerSigned && ownerSigned)
 }
 
+export function bookingChatEligible(booking: { status: string }): boolean {
+  return booking.status === 'approved'
+}
+
 export function canRateBooking(
   status: string,
   endDate: string | null,

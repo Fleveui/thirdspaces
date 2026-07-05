@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { SpaceListing, resolveImageUrl, availabilityBadge } from '@/lib/spaces'
 import { hostRequestsHref } from '@/lib/hostNavigation'
+import { accentClasses } from '@/lib/theme'
 import { BookmarkButton } from '@/components/BookmarkButton'
 
 interface SpaceCardProps {
@@ -26,12 +27,7 @@ export function SpaceCard({
 }: SpaceCardProps) {
   const img = resolveImageUrl(space.image_url, apiUrl)
   const badge = availabilityBadge(space.availability)
-  const imageBg = accent === 'host' ? 'bg-host-cream' : 'bg-primary-light'
-  const placeholderText = accent === 'host' ? 'text-host-cream-accent/50' : 'text-primary/50'
-  const categoryBadge =
-    accent === 'host'
-      ? 'bg-host-cream/60 text-host-cream-accent'
-      : 'bg-primary-light text-primary'
+  const theme = accentClasses(accent)
 
   if (layout === 'row') {
     const showRequestBadge = requestCount !== undefined && requestCount > 0
@@ -39,12 +35,12 @@ export function SpaceCard({
     return (
       <div className="flex gap-4 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow p-3">
         <Link href={`/spaces/${space.id}`} className="flex gap-4 flex-1 min-w-0">
-          <div className={`w-24 h-24 sm:w-28 sm:h-28 shrink-0 rounded-xl ${imageBg} flex items-center justify-center overflow-hidden`}>
+          <div className={`w-24 h-24 sm:w-28 sm:h-28 shrink-0 rounded-xl ${theme.imageBg} flex items-center justify-center overflow-hidden`}>
             {img ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={img} alt={space.name} className="w-full h-full object-cover" />
             ) : (
-              <span className={`${placeholderText} text-xs`}>No photo</span>
+              <span className={`${theme.placeholderText} text-xs`}>No photo</span>
             )}
           </div>
           <div className="flex-1 min-w-0 py-0.5">
@@ -58,7 +54,7 @@ export function SpaceCard({
             </p>
             <div className="flex flex-wrap gap-1.5 mt-2">
               {space.category && (
-                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${categoryBadge}`}>
+                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${theme.categoryBadge}`}>
                   {space.category}
                 </span>
               )}
@@ -89,7 +85,7 @@ export function SpaceCard({
         {showRequestBadge && (
           <Link
             href={hostRequestsHref(space.id)}
-            className="shrink-0 self-center inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-full bg-host-cream border border-host-cream-accent/25 text-dark hover:bg-host-cream-light transition-colors"
+            className={`shrink-0 self-center inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-full transition-colors ${theme.requestBadge}`}
             aria-label={`${requestCount} booking request${requestCount === 1 ? '' : 's'}`}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-host-cream-accent shrink-0">
@@ -119,12 +115,12 @@ export function SpaceCard({
       href={`/spaces/${space.id}`}
       className="block bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow"
     >
-      <div className={`h-44 ${imageBg} flex items-center justify-center`}>
+      <div className={`h-44 ${theme.imageBg} flex items-center justify-center`}>
         {img ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={img} alt={space.name} className="w-full h-full object-cover" />
         ) : (
-          <span className={`${placeholderText} text-sm`}>No photo</span>
+          <span className={`${theme.placeholderText} text-sm`}>No photo</span>
         )}
       </div>
       <div className="p-4">
@@ -140,7 +136,7 @@ export function SpaceCard({
         </p>
         <div className="flex flex-wrap gap-2 mb-3">
           {space.category && (
-            <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${categoryBadge}`}>
+            <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${theme.categoryBadge}`}>
               {space.category}
             </span>
           )}

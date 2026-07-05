@@ -29,6 +29,8 @@ def _migrate_schema(connection) -> None:
         connection.execute(text("ALTER TABLE spaces ADD COLUMN exchange_preferences TEXT"))
     if not _column_exists(connection, "spaces", "max_people"):
         connection.execute(text("ALTER TABLE spaces ADD COLUMN max_people INTEGER"))
+    if _column_exists(connection, "spaces", "deposit_needed"):
+        connection.execute(text("ALTER TABLE spaces DROP COLUMN deposit_needed"))
 
 
 # Create database engine (SQLite)

@@ -27,7 +27,6 @@ def space_to_dict(space: Space, db: Session, include_photos: bool = False) -> di
         "is_outdoor": space.is_outdoor,
         "category": space.category,
         "availability": space.availability,
-        "deposit_needed": space.deposit_needed,
         "location": space.location,
         "description": space.description,
         "rules": space.rules,
@@ -79,7 +78,6 @@ def create_space(
         availability=getattr(data, "availability", None),
         description=getattr(data, "description", None),
         rules=getattr(data, "rules", None),
-        deposit_needed=getattr(data, "deposit_needed", None),
         exchange_preferences=getattr(data, "exchange_preferences", None),
         max_people=getattr(data, "max_people", None),
     )

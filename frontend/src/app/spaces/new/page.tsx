@@ -11,6 +11,7 @@ import { AppShell } from '@/components/AppShell'
 import { PageHeader } from '@/components/PageHeader'
 import { CategoryChips } from '@/components/CategoryChips'
 import { SPACE_CATEGORIES, EXCHANGE_OPTIONS } from '@/lib/spaces'
+import { accentClasses } from '@/lib/theme'
 
 interface FormData {
   name: string
@@ -21,7 +22,6 @@ interface FormData {
   is_outdoor: string
   availability: string
   description: string
-  deposit_needed: string
 }
 
 const initialFormData: FormData = {
@@ -33,11 +33,11 @@ const initialFormData: FormData = {
   is_outdoor: 'false',
   availability: '',
   description: '',
-  deposit_needed: '',
 }
 
 function ListSpaceContent() {
   const router = useRouter()
+  const host = accentClasses('host')
 
   const [formData, setFormData] = useState<FormData>(initialFormData)
   const [exchangeSelected, setExchangeSelected] = useState<string[]>([])
@@ -113,11 +113,6 @@ function ListSpaceContent() {
       const mp = parseInt(formData.max_people, 10)
       if (!isNaN(mp) && mp > 0) body.max_people = mp
     }
-    if (formData.deposit_needed.trim()) {
-      const deposit = parseFloat(formData.deposit_needed)
-      if (!isNaN(deposit) && deposit >= 0) body.deposit_needed = deposit
-    }
-
     try {
       const response = await fetch(`${apiUrl}/api/spaces`, {
         method: 'POST',
@@ -250,7 +245,7 @@ function ListSpaceContent() {
                   onClick={() => setField('is_outdoor', opt.value)}
                   className={`flex-1 py-2.5 rounded-2xl text-sm font-medium border transition-colors ${
                     formData.is_outdoor === opt.value
-                      ? 'bg-host-cream text-dark border-host-cream'
+                      ? host.chipActive
                       : 'border-gray-200 text-gray-600 hover:border-host-cream/40'
                   }`}
                 >
@@ -281,18 +276,16 @@ function ListSpaceContent() {
                   type="button"
                   onClick={() => toggleExchange(option)}
                   className={`w-full flex items-center gap-3 p-3 rounded-2xl border text-left text-sm ${
-                    exchangeSelected.includes(option)
-                      ? 'border-host-cream bg-host-cream-light/40'
-                      : 'border-gray-200'
+                    exchangeSelected.includes(option) ? host.selectedBorder : 'border-gray-200'
                   }`}
                 >
                   <span
                     className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
-                      exchangeSelected.includes(option) ? 'border-host-cream' : 'border-gray-300'
+                      exchangeSelected.includes(option) ? host.radioBorder : 'border-gray-300'
                     }`}
                   >
                     {exchangeSelected.includes(option) && (
-                      <span className="w-2.5 h-2.5 rounded-full bg-host-cream" />
+                      <span className={`w-2.5 h-2.5 rounded-full ${host.radioDot}`} />
                     )}
                   </span>
                   {option}

@@ -23,10 +23,12 @@
 │  │ List Space   │  │ Space Detail │  │  Messages    │        │
 │  │ /spaces/new  │  │ /spaces/[id] │  │  /messages   │        │
 │  └──────────────┘  └──────────────┘  └──────────────┘        │
-│  ┌──────────────┐  ┌──────────────┐  PageHeader + minimal    │
-│  │ Booking Dtl  │  │ Incoming Req │  AppShell (find | host)   │
-│  │ /bookings/id │  │/host/requests│  /find/requests (borrower)│
-│  └──────────────┘  └──────────────┘  /register/verified       │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐        │
+│  │ Booking Dtl  │  │ Incoming Req │  │ Saved Favs   │        │
+│  │ /bookings/id │  │/host/requests│  │/find/favorites│       │
+│  └──────────────┘  └──────────────┘  └──────────────┘        │
+│         PageHeader + minimal AppShell (find | host)            │
+│         /find/requests (borrower)  /register/verified          │
 │         │                 │                   │               │
 │         └─────────────────┴───────────────────┘               │
 │                       │                                       │
@@ -59,6 +61,8 @@
                        │ POST /api/bookings/{id}/rate
                        │ GET /api/chat/conversations
                        │ WebSocket /api/chat/ws/{booking_id}
+                       │ GET /api/favorites
+                       │ GET|POST|DELETE /api/favorites/{space_id}
                        ▼
 ┌──────────────────────────────────────────────────────────────┐
 │        Backend (FastAPI)  http://localhost:8000               │
@@ -67,7 +71,7 @@
 │  │  main.py (entry point)                                 │  │
 │  │  - starts FastAPI server                               │  │
 │  │  - enables CORS for frontend                           │  │
-│  │  - includes auth, spaces, bookings, and chat routes       │  │
+│  │  - includes auth, spaces, bookings, favorites, chat routes│  │
 │  └────────────────────────────────────────────────────────┘  │
 │                       │                                       │
 │  ┌────────────────────▼────────────────────────────────────┐  │
@@ -95,6 +99,14 @@
 │  │  - GET /api/bookings/{id} (owner or borrower)          │  │
 │  │  - PATCH approve|reject|sign                           │  │
 │  │  - POST /api/bookings/{id}/rate                        │  │
+│  └────────────────────┬───────────────────────────────────┘  │
+│                       │                                       │
+│  ┌────────────────────▼────────────────────────────────────┐  │
+│  │  routes/favorites.py (HTTP endpoints)                │  │
+│  │  - GET /api/favorites (saved spaces for user)        │  │
+│  │  - GET /api/favorites/{space_id} (favorited status)  │  │
+│  │  - POST /api/favorites/{space_id} (save)             │  │
+│  │  - DELETE /api/favorites/{space_id} (remove)       │  │
 │  └────────────────────┬───────────────────────────────────┘  │
 │                       │                                       │
 │  ┌────────────────────▼────────────────────────────────────┐  │
@@ -133,6 +145,12 @@
 │  └────────────────────┬───────────────────────────────────┘  │
 │                       │                                       │
 │  ┌────────────────────▼────────────────────────────────────┐  │
+│  │  services/favorites.py (business logic)              │  │
+│  │  - list_favorites(), is_favorited()                    │  │
+│  │  - add_favorite(), remove_favorite()                   │  │
+│  └────────────────────┬───────────────────────────────────┘  │
+│                       │                                       │
+│  ┌────────────────────▼────────────────────────────────────┐  │
 │  │  models.py (database schema)                            │  │
 │  │  - User:                                               │  │
 │  │    • id (UUID)                                         │  │
@@ -165,7 +183,7 @@
 │      • id, name, surname, company, company_email             │
 │  - space (available spaces)                                  │
 │      • id, name, owner_id, area_m2, is_outdoor,             │
-│      • category, availability, deposit_needed, location,     │
+│      • category, availability, location,                     │
 │      • description, rules, exchange_preferences            │
 │  - booking (reservation requests)                            │
 │      • booking_id, space_id, borrower_id, start_date,       │
@@ -173,11 +191,14 @@
 │      • contract_text, borrower_signed_at, owner_signed_at   │
 │  - space_photo (images)                                      │
 │      • photo_id, space_id, image_url, position               │
+│  - space_favorite (saved spaces per user)                    │
+│      • id, user_id, space_id, created_at (unique pair)       │
 │  - conversation, message (chat)                              │
 │  - rating (post-visit ratings)                               │
 │                                                               │
 │  Relationships:                                              │
 │  users (space_owner) → space.owner_id                        │
+│  users → space_favorite → space (saved listings)             │
 │  personal_account → booking → space ← business_account       │
 │                          ↑            ↓                      │
 │                          └── space_photo                      │
@@ -189,7 +210,7 @@
 | Component | Type | Runs How | Port | Purpose |
 |-----------|------|----------|------|---------|
 | Frontend | local/docker | Node.js in container | 3000 | Match for Space UI (Next.js) |
-| Backend | local/docker | Python in container | 8000 | API server (auth, spaces, bookings) |
+| Backend | local/docker | Python in container | 8000 | API server (auth, spaces, bookings, favorites) |
 | Database | local/docker | SQLite in container | - | User data and credentials |
 
 ## Tech Stack Decisions
@@ -415,9 +436,11 @@
 ```
 1. User logs in → redirects to /dashboard (home hub)
    ↓
-2. Hub shows mode cards and request strips:
+2. Hub header: LogoMark badge avatar + username; messages, incoming-requests bell, logout
+   Hub body: mode cards and request strips:
    - Find a space → /find
    - My booking requests → /find/requests
+   - Saved favorites → /find/favorites
    - List your space → /host
    - Incoming requests → /host/requests
    Optional badges for pending booking counts
@@ -444,6 +467,28 @@
 5. User clicks space → /spaces/{id} → Book Now flow
    ↓
 6. GET /api/bookings/my-requests → "My booking requests" on `/find` and `/find/requests`
+   ↓
+7. Bookmark toggle on SpaceCard rows and non-owner space detail
+   GET /api/favorites/{space_id} on load; POST or DELETE to save/remove
+```
+
+## Data Flow: Saved Favorites (Find Mode)
+
+```
+1. User opens /find/favorites (from dashboard strip or find flow)
+   ↓
+2. GET /api/favorites
+   Headers: Authorization: Bearer <token>
+   ↓
+3. Backend: list_favorites(user_id) → SpaceResponse[] (newest first)
+   ↓
+4. Frontend renders purple gradient section with bookmarked SpaceCard rows
+   ↓
+5. Toggle bookmark on find results or /spaces/{id} (non-owner view):
+   - POST /api/favorites/{space_id} → 201 { favorited: true }
+   - DELETE /api/favorites/{space_id} → 204
+   ↓
+6. BookmarkButton + favorites.ts helpers keep UI in sync
 ```
 
 ## Data Flow: Create Space Listing (Any Logged-in User)
@@ -455,7 +500,7 @@
    ↓
 3. User fills form:
    name, location, area_m2, category, is_outdoor,
-   availability, description, rules, exchange_preferences, deposit_needed
+   availability, description, rules, exchange_preferences
    ↓
 4. Frontend validation (required fields, area > 0)
    ↓
@@ -565,6 +610,7 @@
    ↓
 4a. Find view (not owner):
    - Purple/lavender accents, availability badge
+   - BookmarkButton (GET/POST/DELETE /api/favorites/{space_id})
    - Book Now form for authenticated non-owners
    - Back → /find
    ↓
@@ -602,9 +648,9 @@ The UI is branded **Match for Space** with dual accents: purple for **Find** and
 | `primary` | `#a166ff` | Find buttons, links, lavender inputs |
 | `primary-dark` | `#8a4de6` | Button hover states |
 | `primary-light` | `#f3ebff` | Find subtle backgrounds |
-| `host-cream` | `#f7d58f` | Host buttons, badges, strips (max darkness) |
-| `host-cream-light` | `#fae4ad` | Host input backgrounds |
-| `host-cream-accent` | `#8b6018` | Host text accents |
+| `host-cream` | `#ffbe68` | Host buttons, badges, strips |
+| `host-cream-light` | `#ffd9a8` | Host input backgrounds |
+| `host-cream-accent` | `#9a5516` | Host text accents |
 | Font | IBM Plex Sans | Loaded via `next/font/google` in `layout.tsx` |
 
 **Shared UI classes** (defined in `frontend/src/app/globals.css`):
@@ -617,11 +663,12 @@ The UI is branded **Match for Space** with dual accents: purple for **Find** and
 
 **Shared components:**
 
-- `LogoMark` — logo with `badge` and `mark` variants
-- `SparkleIcon` — star icon (CSS mask from `/star.png`)
+- `LogoMark` — logo with `badge` (purple circle + white mark; login splash and dashboard profile avatar) and `mark` variants
+- `SparkleIcon` — star icon on find/host intro hubs and registration pages (CSS mask from `/star.png`)
 - `PageHeader` — back arrow + title (contextual navigation)
 - `AppShell` — `mode` (find | host), `variant` (full | minimal)
-- `HubActionCard` — dashboard mode cards and request strips
+- `HubActionCard` — dashboard mode cards and request strips (`SavedFavoritesStrip`)
+- `BookmarkButton` — toggle save on find SpaceCard rows and space detail
 - `SpaceCard` — listing card/row with find or host accent; request badge on host listings
 - `IncomingRequestCard` — host incoming request card (cream / green / red status)
 - `MyBookingRequestCard` — borrower request card (find accent)
@@ -630,13 +677,14 @@ The UI is branded **Match for Space** with dual accents: purple for **Find** and
 **Navigation helpers:**
 
 - `frontend/src/lib/hostNavigation.ts` — `hostRequestsHref(spaceId?)`, `hostRequestsBackHref(spaceId)`
+- `frontend/src/lib/favorites.ts` — `fetchFavorites`, `addFavorite`, `removeFavorite`, `fetchFavoriteStatus`
 
 **Key routes:**
 
 - `/` — landing with inline login; `/login` redirects here
 - `/register` — registration; `/register/verified` — post-signup confirmation
-- `/dashboard` — home hub (Find, My booking requests, List your space, Incoming requests)
-- `/find` — intro + search/results; `/find/requests` — borrower's outgoing requests
+- `/dashboard` — home hub: logo badge + username header; Find, My booking requests, Saved favorites, List your space, Incoming requests; messages icon → `/messages`
+- `/find` — intro + search/results; `/find/requests` — borrower's outgoing requests; `/find/favorites` — saved spaces
 - `/host` — intro hub; `/host?view=listings` — your listing rows
 - `/host/requests` — incoming requests (`?space_id={id}` for contextual back)
 - `/spaces/new` — create listing (cream form)
@@ -705,7 +753,7 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 
 ### Complete Schema
 
-The database has 5 tables, mapped from the Excel file `database edt.xlsx`:
+The database maps core entities from the Excel file `database edt.xlsx`, plus app tables (`users`, `space_favorite`, chat, ratings):
 
 ```
 personal_account          business_account
@@ -725,7 +773,6 @@ space
 ├─ is_outdoor
 ├─ category
 ├─ availability
-├─ deposit_needed
 ├─ location
 ├─ description
 ├─ rules
@@ -772,6 +819,13 @@ rating
 ├─ score (1–5)
 ├─ comment (Text, nullable)
 └─ created_at
+
+space_favorite
+├─ id (PK)
+├─ user_id (FK) ────→ users.id
+├─ space_id (FK) ────→ space.id
+├─ created_at
+└─ unique (user_id, space_id)
 ```
 
 ### Import Process
@@ -834,8 +888,8 @@ Community Space Sharing Platform - Excel Import
 ## Current Phase: Full Flowchart MVP
 
 **Implemented:**
-- **Match for Space UI** — dual theme: find purple (`#a166ff`), host cream (`#f7d58f`), IBM Plex Sans, landing login on `/`
-- **Dashboard hub** — mode cards plus My booking requests and Incoming requests strips with pending badges
+- **Match for Space UI** — dual theme: find purple (`#a166ff`), host cream (`#ffbe68`), IBM Plex Sans, landing login on `/`
+- **Dashboard hub** — mode cards plus My booking requests, Saved favorites, and Incoming requests strips with pending badges
 - **Find/Host intro + task views** — `/find` and `/host` mirror layout (intro → results/listings); `/find/requests`, `/host/requests`
 - **Contextual navigation** — `PageHeader` back arrows; `hostNavigation.ts` (`space_id` on incoming requests)
 - **Space detail** — full list-a-space fields, photo placeholder, owner vs find accents and actions
@@ -843,16 +897,16 @@ Community Space Sharing Platform - Excel Import
 - **Incoming requests UI** — cream theme; confirmed green / rejected red badges and card outlines
 - **Space discovery** — filterable `GET /api/spaces`; optional auth excludes own listings
 - **Listings** — cream form at `/spaces/new`, photo upload, `exchange_preferences`
+- **Saved favorites** — `space_favorite` table, `/api/favorites` CRUD, `/find/favorites`, bookmark on find cards and detail
 - **Borrower booking** — Book Now, `/find/requests`, lavender form styling
 - **Owner workflow** — approve/reject on `/host/requests`, contracts and ratings on `/bookings/{id}`
 - **Auth** — `authFetch`, 401 session clearing, 24 h JWT default
 - **Chat** — `/messages`, WebSocket
 - **Demo seed** — Milan + Bolzano spaces, `demoowner` / `secret12`
-- Backend tests (61+)
+- Backend tests (70+)
 
 **Not yet implemented:**
 - Availability calendar widget (text field only for now)
-- Saved spaces / favourites
 - Email verification (UI flow only)
 - Production deployment (PostgreSQL, HTTPS, refresh tokens)
 
@@ -860,7 +914,6 @@ Community Space Sharing Platform - Excel Import
 
 ### Phase 2: Polish & Discovery
 - Availability calendar widget on listing and detail pages
-- Saved spaces / favourites
 - Proximity-based search ordering
 
 ### Phase 3: Production Deployment

@@ -32,9 +32,13 @@ def db():
         Base.metadata.drop_all(bind=engine)
 
 
+@pytest.fixture(autouse=True)
+def patch_ws_db(db, monkeypatch):
+    monkeypatch.setattr("routes.chat.create_ws_db", lambda: db)
+
+
 @pytest.fixture
 def client(db):
-    """FastAPI test client with database dependency overridden."""
 
     def override_get_db():
         try:

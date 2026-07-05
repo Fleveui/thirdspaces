@@ -88,6 +88,13 @@ def list_bookings_for_borrower(borrower_id: str, db: Session) -> List[dict]:
     return [_booking_row_to_dict(booking, space, borrower, "borrower") for booking, space, borrower in rows]
 
 
+def _ensure_approved_contract(booking: Booking, space: Space, db: Session) -> None:
+    if booking.status == "approved" and not booking.contract_text:
+        booking.contract_text = _generate_contract_text(space, booking)
+        db.commit()
+        db.refresh(booking)
+
+
 def get_booking_for_owner(booking_id: str, owner_id: str, db: Session) -> Optional[dict]:
     row = (
         _owner_bookings_query(owner_id, db)
@@ -97,6 +104,7 @@ def get_booking_for_owner(booking_id: str, owner_id: str, db: Session) -> Option
     if not row:
         return None
     booking, space, borrower = row
+    _ensure_approved_contract(booking, space, db)
     return _booking_row_to_dict(booking, space, borrower, "owner")
 
 
@@ -111,6 +119,7 @@ def get_booking_for_borrower(booking_id: str, borrower_id: str, db: Session) -> 
     if not row:
         return None
     booking, space, borrower = row
+    _ensure_approved_contract(booking, space, db)
     return _booking_row_to_dict(booking, space, borrower, "borrower")
 
 

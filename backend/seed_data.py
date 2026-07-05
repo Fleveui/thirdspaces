@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from database import SessionLocal
 from models import Space, Booking, PersonalAccount, User, AccountType
 from services.auth import hash_password
+from services.bookings import _generate_contract_text
 import uuid
 
 def seed_database():
@@ -70,7 +71,6 @@ def seed_database():
                 "is_outdoor": False,
                 "category": "Workshop",
                 "availability": "Weekends",
-                "deposit_needed": 500.0,
                 "max_people": 35,
                 "location": "Via Laurin, Bolzano",
                 "description": "Spacious open-plan loft in Bolzano city centre with mountain views. Ideal for workshops, exhibitions, and community gatherings.",
@@ -83,7 +83,6 @@ def seed_database():
                 "is_outdoor": True,
                 "category": "Exhibition",
                 "availability": "Flexible",
-                "deposit_needed": 300.0,
                 "max_people": 25,
                 "location": "Piazza Walther, Bolzano",
                 "description": "Rooftop terrace with views of the Dolomites, perfect for outdoor events, drinks, and small performances.",
@@ -96,7 +95,6 @@ def seed_database():
                 "is_outdoor": False,
                 "category": "Conference",
                 "availability": "Hourly",
-                "deposit_needed": 150.0,
                 "max_people": 15,
                 "location": "Via dei Portici, Bolzano",
                 "description": "Central meeting room with Wi-Fi, projector, and whiteboard. For meetings, training, and small professional events.",
@@ -109,7 +107,6 @@ def seed_database():
                 "is_outdoor": False,
                 "category": "Workshop",
                 "availability": "Weekends",
-                "deposit_needed": 350.0,
                 "max_people": 30,
                 "location": "Via Laurin, Bolzano",
                 "description": "Bright loft in Bolzano city centre with mountain views. Ideal for workshops, pop-up exhibitions, and small community events.",
@@ -123,7 +120,6 @@ def seed_database():
                 "is_outdoor": True,
                 "category": "Exhibition",
                 "availability": "Flexible",
-                "deposit_needed": 250.0,
                 "max_people": 25,
                 "location": "Piazza Walther, Bolzano",
                 "description": "Sunny terrace steps from Piazza Walther. Perfect for outdoor meetups, aperitivos, and summer gatherings.",
@@ -137,7 +133,6 @@ def seed_database():
                 "is_outdoor": False,
                 "category": "Crafting",
                 "availability": "Weekdays 10-18",
-                "deposit_needed": 300.0,
                 "max_people": 20,
                 "location": "Via Rafenstein, Bolzano",
                 "description": "Creative studio in Oltrisarco with workbenches, natural light, and a small kitchen. Suited for craft workshops and coworking.",
@@ -151,7 +146,6 @@ def seed_database():
                 "is_outdoor": True,
                 "category": "Physical activity",
                 "availability": "Daily",
-                "deposit_needed": 100.0,
                 "max_people": 40,
                 "location": "Via Europa, Bolzano",
                 "description": "Shared garden plot with picnic tables and a toolshed. Great for gardening workshops, outdoor classes, and community dinners.",
@@ -165,7 +159,6 @@ def seed_database():
                 "is_outdoor": False,
                 "category": "Music",
                 "availability": "Weekdays 9-18",
-                "deposit_needed": 400.0,
                 "max_people": 25,
                 "location": "Via Gries, Bolzano",
                 "description": "Creative studio with natural light, work tables, and a lounge area. Suited for music rehearsals, classes, and artist residencies.",
@@ -178,7 +171,6 @@ def seed_database():
                 "is_outdoor": True,
                 "category": "Physical activity",
                 "availability": "Daily",
-                "deposit_needed": 200.0,
                 "max_people": 50,
                 "location": "Via Don Bosco, Bolzano",
                 "description": "Urban garden with a community allotment, picnic area, and space for outdoor workshops.",
@@ -233,6 +225,8 @@ def seed_database():
                 intended_use="Creative residency and community workshop",
                 created_at=datetime.utcnow(),
             )
+            if booking_statuses[i] == "approved":
+                booking.contract_text = _generate_contract_text(space, booking)
             db.add(booking)
 
         db.commit()

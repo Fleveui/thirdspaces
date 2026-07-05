@@ -15,7 +15,6 @@ def make_space_data(**overrides):
         "availability": "Weekends",
         "description": "A bright loft",
         "rules": "No smoking",
-        "deposit_needed": 250.0,
     }
     defaults.update(overrides)
     return SimpleNamespace(**defaults)
@@ -37,7 +36,6 @@ class TestCreateSpace:
         assert space.availability == "Weekends"
         assert space.description == "A bright loft"
         assert space.rules == "No smoking"
-        assert space.deposit_needed == 250.0
         assert space.id
 
     def test_create_space_strips_whitespace(self, db):

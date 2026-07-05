@@ -6,10 +6,11 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
 import { AppShell } from '@/components/AppShell'
+import { PageHeader } from '@/components/PageHeader'
 import {
   OwnerBooking,
   formatDate,
@@ -18,10 +19,39 @@ import {
   borrowerStatusMessage,
   contractFullySigned,
   canRateBooking,
+  bookingChatEligible,
 } from '@/lib/bookings'
+import { messagesChatHref } from '@/lib/chat'
+import { accentClasses } from '@/lib/theme'
+
+function panelClass() {
+  return 'rounded-3xl border border-gray-100 bg-white shadow-sm p-5'
+}
+
+function DetailField({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <h2 className="text-sm font-semibold text-dark mb-1">{label}</h2>
+      <div className="text-gray-600 text-sm">{children}</div>
+    </div>
+  )
+}
+
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/)
+  if (parts.length >= 2) return `${parts[0][0]}${parts[1][0]}`.toUpperCase()
+  return name.slice(0, 2).toUpperCase()
+}
+
+function statusBadgeClass(status: string): string {
+  if (status === 'pending') return 'bg-orange-50 text-orange-600'
+  if (status === 'approved') return 'bg-green-50 text-green-700'
+  return 'bg-gray-100 text-gray-600'
+}
 
 function BookingDetailContent() {
   const params = useParams()
+  const router = useRouter()
   const { user } = useAuth()
   const bookingId = params.id as string
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
@@ -66,16 +96,19 @@ function BookingDetailContent() {
   }, [bookingId, apiUrl])
 
   const isOwner = booking?.role === 'owner' || (user && booking?.owner_id === user.id)
+  const accent = isOwner ? 'host' : 'find'
+  const theme = accentClasses(accent)
+  const backHref = isOwner ? '/host/requests' : '/find/requests'
+  const pageTitle = loading ? 'Booking' : notFound ? 'Not found' : booking?.space_name ?? 'Booking'
 
   const handleAction = async (action: 'approve' | 'reject' | 'sign') => {
     setSubmitting(true)
     setActionError(null)
     try {
       const token = localStorage.getItem('auth_token')
-      const method = action === 'sign' ? 'PATCH' : 'PATCH'
       const path = action === 'sign' ? 'sign' : action
       const response = await fetch(`${apiUrl}/api/bookings/${bookingId}/${path}`, {
-        method,
+        method: 'PATCH',
         headers: { Authorization: `Bearer ${token}` },
       })
       if (!response.ok) {
@@ -120,73 +153,117 @@ function BookingDetailContent() {
   const otherSigned =
     isOwner ? Boolean(booking?.borrower_signed_at) : Boolean(booking?.owner_signed_at)
 
-  const backHref = isOwner ? '/host' : '/find'
-  const backLabel = isOwner ? 'Back to My spaces' : 'Back to Find a space'
-
   return (
-    <AppShell mode={isOwner ? 'host' : 'find'}>
-      <div className="max-w-2xl mx-auto">
-        <div className="mb-6">
-          <Link href={backHref} className="font-medium text-primary hover:underline">
-            {backLabel}
-          </Link>
-        </div>
+    <AppShell mode={isOwner ? 'host' : 'find'} variant="minimal">
+      <div className="max-w-xl mx-auto">
+        <PageHeader
+          title={pageTitle}
+          onBack={() => router.push(backHref)}
+        />
 
         {loading ? (
-          <div className="card"><p className="text-gray-600 text-sm">Loading booking details...</p></div>
+          <p className="text-gray-600 text-sm text-center py-12">Loading booking details...</p>
         ) : notFound ? (
-          <div className="card"><h1 className="text-2xl font-bold text-dark mb-2">Booking not found</h1></div>
+          <div className={panelClass()}>
+            <h1 className="text-xl font-bold text-dark">Booking not found</h1>
+          </div>
         ) : error ? (
-          <div className="card"><p className="text-red-600 text-sm">{error}</p></div>
+          <p className="text-red-600 text-sm text-center py-12">{error}</p>
         ) : booking ? (
-          <div className="card">
-            <h1 className="text-2xl font-bold text-primary mb-2">Booking</h1>
-            <p className="text-sm text-gray-600 mb-2">{statusLabel(booking.status)}</p>
-            {!isOwner && borrowerStatusMessage(booking.status) && (
-              <p className="text-sm text-primary italic mb-4">{borrowerStatusMessage(booking.status)}</p>
-            )}
-
-            <div className="space-y-5">
-              <div>
-                <h2 className="text-sm font-medium text-gray-600 mb-1">Space</h2>
-                <Link href={`/spaces/${booking.space_id}`} className="font-medium text-primary hover:underline">
-                  {booking.space_name}
-                </Link>
-              </div>
-              {isOwner && booking.borrower_name && (
-                <div>
-                  <h2 className="text-sm font-medium text-gray-600 mb-1">Borrower</h2>
-                  <p className="text-dark">{booking.borrower_name}</p>
+          <div className="space-y-4">
+            <div className={`${panelClass()} p-4`}>
+              <div className="flex gap-3">
+                <div
+                  className={`w-12 h-12 rounded-full font-semibold flex items-center justify-center shrink-0 ${
+                    isOwner
+                      ? 'bg-host-cream-light text-host-cream-accent'
+                      : 'bg-primary-light text-primary'
+                  }`}
+                >
+                  {isOwner
+                    ? initials(booking.borrower_name)
+                    : initials(booking.space_name)}
                 </div>
-              )}
-              <div>
-                <h2 className="text-sm font-medium text-gray-600 mb-1">Dates</h2>
-                <p className="text-dark">{formatDateRange(booking.start_date, booking.end_date)}</p>
-              </div>
-              {booking.intended_use && (
-                <div>
-                  <h2 className="text-sm font-medium text-gray-600 mb-1">Intended use</h2>
-                  <p className="text-dark">{booking.intended_use}</p>
+                <div className="flex-1 min-w-0">
+                  <div className="flex justify-between items-start gap-2">
+                    <div>
+                      <p className="font-bold text-dark">
+                        {isOwner ? booking.borrower_name : booking.space_name}
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        {isOwner
+                          ? booking.space_name
+                          : booking.space_location || 'Bolzano'}
+                      </p>
+                    </div>
+                    <span
+                      className={`text-xs font-medium px-2.5 py-1 rounded-full shrink-0 ${statusBadgeClass(booking.status)}`}
+                    >
+                      {statusLabel(booking.status)}
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-500 mt-2 flex items-center gap-1.5">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <rect x="3" y="4" width="18" height="18" rx="2" />
+                      <path d="M16 2v4M8 2v4M3 10h18" />
+                    </svg>
+                    {formatDateRange(booking.start_date, booking.end_date)}
+                  </p>
+                  {!isOwner && borrowerStatusMessage(booking.status) && (
+                    <p className="text-sm text-primary italic mt-2">
+                      {borrowerStatusMessage(booking.status)}
+                    </p>
+                  )}
                 </div>
-              )}
-              <div>
-                <h2 className="text-sm font-medium text-gray-600 mb-1">Offered in exchange</h2>
-                <p className="text-dark whitespace-pre-wrap">
-                  {booking.exchange_offer?.trim() || 'No exchange offer provided'}
-                </p>
-              </div>
-              <div>
-                <h2 className="text-sm font-medium text-gray-600 mb-1">Requested on</h2>
-                <p className="text-dark">{formatDate(booking.created_at)}</p>
               </div>
             </div>
 
-            {booking.status === 'approved' && booking.contract_text && (
-              <div className="mt-8 p-4 bg-primary-light/50 rounded-2xl">
-                <h2 className="font-semibold text-dark mb-2">Agreement</h2>
-                <pre className="text-sm text-gray-700 whitespace-pre-wrap font-sans mb-4">
-                  {booking.contract_text}
-                </pre>
+            <div className={panelClass()}>
+              <div className="space-y-5">
+                {!isOwner && (
+                  <DetailField label="Space">
+                    <Link href={`/spaces/${booking.space_id}`} className={`font-medium ${theme.link}`}>
+                      {booking.space_name}
+                    </Link>
+                  </DetailField>
+                )}
+                {isOwner && booking.borrower_name && (
+                  <DetailField label="Borrower">
+                    <p>{booking.borrower_name}</p>
+                    {booking.borrower_email && (
+                      <p className="text-gray-500 mt-0.5">{booking.borrower_email}</p>
+                    )}
+                  </DetailField>
+                )}
+                {booking.intended_use && (
+                  <DetailField label="Intended use">
+                    <p className="whitespace-pre-wrap">{booking.intended_use}</p>
+                  </DetailField>
+                )}
+                <DetailField label="Offered in exchange">
+                  <p className="whitespace-pre-wrap">
+                    {booking.exchange_offer?.trim() || 'No exchange offer provided'}
+                  </p>
+                </DetailField>
+                <DetailField label="Requested on">
+                  {formatDate(booking.created_at)}
+                </DetailField>
+              </div>
+            </div>
+
+            {booking.status === 'approved' && (
+              <div className={theme.successBanner}>
+                <h2 className={`${theme.successTitle} mb-2`}>Agreement</h2>
+                {!booking.contract_text && (
+                  <p className="text-sm text-gray-600 mb-3">
+                    Review and accept the agreement below.
+                  </p>
+                )}
+                {booking.contract_text && (
+                  <pre className="text-sm text-gray-700 whitespace-pre-wrap font-sans mb-4 rounded-2xl">
+                    {booking.contract_text}
+                  </pre>
+                )}
                 <p className="text-xs text-gray-500 mb-3">
                   Borrower: {booking.borrower_signed_at ? 'Signed' : 'Pending'} · Owner:{' '}
                   {booking.owner_signed_at ? 'Signed' : 'Pending'}
@@ -196,7 +273,7 @@ function BookingDetailContent() {
                     type="button"
                     onClick={() => handleAction('sign')}
                     disabled={submitting}
-                    className="btn-primary disabled:opacity-50"
+                    className={`${theme.primaryBtn} disabled:opacity-50`}
                   >
                     I agree
                   </button>
@@ -204,15 +281,20 @@ function BookingDetailContent() {
                 {userSigned && !otherSigned && (
                   <p className="text-sm text-gray-600">Waiting for the other party to sign.</p>
                 )}
-                {contractFullySigned(booking.borrower_signed_at, booking.owner_signed_at) && (
-                  <Link
-                    href={`/messages?booking=${booking.booking_id}`}
-                    className="btn-outline text-sm inline-block mt-2"
-                  >
-                    Open chat
-                  </Link>
-                )}
               </div>
+            )}
+
+            {bookingChatEligible(booking) && (
+              <Link
+                href={messagesChatHref(booking.booking_id)}
+                className={`block text-center text-sm px-6 py-3 rounded-2xl font-semibold border-2 ${
+                  isOwner
+                    ? 'bg-white text-host-cream-accent border-host-cream hover:bg-host-cream-light/50'
+                    : 'btn-outline'
+                }`}
+              >
+                Open chat
+              </Link>
             )}
 
             {canRateBooking(
@@ -221,12 +303,12 @@ function BookingDetailContent() {
               booking.borrower_signed_at,
               booking.owner_signed_at
             ) && !ratingMessage && (
-              <div className="mt-8 border-t border-gray-100 pt-6">
+              <div className={panelClass()}>
                 <h2 className="font-semibold text-dark mb-3">Rate after visit</h2>
                 <select
                   value={rating}
                   onChange={(e) => setRating(Number(e.target.value))}
-                  className="input mb-3"
+                  className={`${theme.inputClass} mb-3 w-full`}
                 >
                   {[5, 4, 3, 2, 1].map((n) => (
                     <option key={n} value={n}>{n} stars</option>
@@ -236,30 +318,34 @@ function BookingDetailContent() {
                   placeholder="Optional comment"
                   value={ratingComment}
                   onChange={(e) => setRatingComment(e.target.value)}
-                  className="input resize-y mb-3"
+                  className={`${theme.inputClass} resize-y mb-3 w-full`}
                   rows={2}
                 />
                 <button
                   type="button"
                   onClick={handleRate}
                   disabled={submitting}
-                  className="btn-primary disabled:opacity-50"
+                  className={`${theme.primaryBtn} disabled:opacity-50`}
                 >
                   Submit rating
                 </button>
               </div>
             )}
-            {ratingMessage && <p className="text-primary text-sm mt-6">{ratingMessage}</p>}
+            {ratingMessage && (
+              <p className={`text-sm text-center ${isOwner ? 'text-host-cream-accent' : 'text-primary'}`}>
+                {ratingMessage}
+              </p>
+            )}
 
-            {actionError && <p className="text-red-600 text-sm mt-6">{actionError}</p>}
+            {actionError && <p className="text-red-600 text-sm text-center">{actionError}</p>}
 
             {isOwner && booking.status === 'pending' && (
-              <div className="flex gap-3 mt-8">
+              <div className="flex gap-2">
                 <button
                   type="button"
                   onClick={() => handleAction('approve')}
                   disabled={submitting}
-                  className="btn-primary disabled:opacity-50"
+                  className="btn-host text-sm px-4 py-3 flex-1 rounded-2xl disabled:opacity-50"
                 >
                   Accept
                 </button>
@@ -267,7 +353,7 @@ function BookingDetailContent() {
                   type="button"
                   onClick={() => handleAction('reject')}
                   disabled={submitting}
-                  className="btn-secondary disabled:opacity-50"
+                  className="btn-host-outline text-sm px-4 py-3 flex-1 rounded-2xl disabled:opacity-50"
                 >
                   Reject
                 </button>

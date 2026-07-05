@@ -60,7 +60,7 @@ Each space page shows:
 - rules
 - Book Now button
 
-**Listing creation (implemented):** Space owners can create listings via the **List a Space** form (`/spaces/new`). The form captures name, location, dimensions (area_m2), indoor/outdoor, availability (text), description, rules, space type (category), and deposit. Photos are not yet supported in the create flow.
+**Listing creation (implemented):** Space owners can create listings via the **List a Space** form (`/spaces/new`). The form captures name, location, dimensions (area_m2), indoor/outdoor, availability (text), description, rules, and space type (category). Photos are not yet supported in the create flow.
 
 **Space detail page:** Not yet implemented — public `GET /api/spaces/{id}` returns full space data including description and rules.
 
@@ -99,11 +99,12 @@ If rejected:
 ### 6. Chat
 After acceptance, user and owner can chat.
 
-Chat features:
-- real-time messages
-- image sharing
-- booking reference
-- notifications
+Chat features (MVP):
+- real-time text messages (WebSocket)
+- booking reference in thread header
+- dashboard entry and links from signed bookings
+
+Deferred: image sharing, push/email notifications.
 
 ### 7. User Dashboard
 Users can view:
@@ -126,7 +127,7 @@ Owners can manage:
 - **List a Space** — header button and `/spaces/new` form to create a listing (`POST /api/spaces`)
 - **Your Listings** — dashboard section showing each owned space's **name** and **location** (`GET /api/spaces/mine`)
 
-**Not yet implemented:** availability calendars, booking requests, accepted bookings, messages, profile editing, listing edit/delete, photos on create.
+**Not yet implemented:** availability calendars, profile editing, listing edit/delete.
 
 ## Implementation Status (summary)
 

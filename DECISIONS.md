@@ -114,7 +114,7 @@
 **Tables created:**
 - `personal_account` (ID, NAME, SURNAME, E-MAIL, password_hash)
 - `business_account` (ID, NAME, SURNAME, COMPANY, COMPANY_EMAIL, password_hash)
-- `space` (ID, NAME, OWNER_ID, AREA_M2, IS_OUTDOOR, CATEGORY, AVAILABILITY, DEPOSIT_NEEDED, LOCATION, DESCRIPTION, RULES)
+- `space` (ID, NAME, OWNER_ID, AREA_M2, IS_OUTDOOR, CATEGORY, AVAILABILITY, LOCATION, DESCRIPTION, RULES)
 - `booking` (BOOKING_ID, SPACE_ID, BORROWER_ID, START_DATE, END_DATE, STATUS)
 - `space_photo` (PHOTO_ID, SPACE_ID, IMAGE_URL, POSITION)
 
@@ -138,7 +138,7 @@
 
 **What we decided:**
 - **List a Space** button on the owner dashboard header → form at `/spaces/new`
-- `POST /api/spaces` with `CreateSpaceRequest` (name, location, area_m2, category, plus optional is_outdoor, availability, description, rules, deposit_needed)
+- `POST /api/spaces` with `CreateSpaceRequest` (name, location, area_m2, category, plus optional is_outdoor, availability, description, rules)
 - `owner_id` set from authenticated `users.id` (JWT), not `business_account.id`
 - Shared auth in `dependencies.py`: `get_current_user()` + `require_space_owner()` (403 for non-owners)
 - Business logic in `services/spaces.py` → `create_space()`
@@ -215,7 +215,7 @@ Shows import progress for each sheet and count of records imported.
 **Implemented (partial):**
 - Space owners see a **List a Space** button (links to `/spaces/new`)
 - Space owners see **Your Listings** (name + location) fetched from `GET /api/spaces/mine`
-- Regular users see placeholder sections for bookings, saved spaces, messages
+- Regular users use the dashboard hub with a `LogoMark` badge avatar and username in the header, Find/Host mode cards, booking strips, favorites, and messages / incoming-requests icons (`/messages`, `/host/requests`)
 
 **Why:** Keeps one entry point after login; content branches on `account_type` without separate routes.
 

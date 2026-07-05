@@ -50,7 +50,7 @@ thirdspaces/
 │   │   │   │   └── verified/
 │   │   │   │       └── page.tsx     — post-registration confirmation
 │   │   │   ├── dashboard/
-│   │   │   │   └── page.tsx         — home hub (Find / My booking requests / List your space / Incoming requests)
+│   │   │   │   └── page.tsx         — home hub (logo avatar + username header; Find / booking strips / host strips)
 │   │   │   ├── find/
 │   │   │   │   ├── page.tsx         — Find mode: intro, search, filters, results, my booking requests strip
 │   │   │   │   └── requests/
@@ -60,10 +60,10 @@ thirdspaces/
 │   │   │   │   └── requests/
 │   │   │   │       └── page.tsx     — incoming booking requests (approve/reject, cream theme)
 │   │   │   ├── messages/
-│   │   │   │   └── page.tsx         — chat conversations (WebSocket)
+│   │   │   │   └── page.tsx         — messages overview + chat drill-down (?booking=, WebSocket)
 │   │   │   ├── bookings/
 │   │   │   │   └── [id]/
-│   │   │   │       └── page.tsx     — booking detail (approve, sign, rate)
+│   │   │   │       └── page.tsx     — booking detail (minimal shell, PageHeader, approve/sign/rate)
 │   │   │   ├── spaces/
 │   │   │   │   ├── page.tsx         — redirects to /find
 │   │   │   │   ├── [id]/
@@ -82,8 +82,8 @@ thirdspaces/
 │   │   │   ├── CategoryChips.tsx    — category selector (find or host variant)
 │   │   │   ├── FilterPanel.tsx      — find-mode filter panel
 │   │   │   ├── SearchBar.tsx        — find-mode search input
-│   │   │   ├── LogoMark.tsx         — logo (badge / mark variants)
-│   │   │   ├── SparkleIcon.tsx      — star/sparkle icon (CSS mask)
+│   │   │   ├── LogoMark.tsx         — logo (badge / mark variants; badge used on login + dashboard avatar)
+│   │   │   ├── SparkleIcon.tsx      — star/sparkle icon (find/host intros, register; not dashboard)
 │   │   │   ├── ModeNav.tsx          — Find | My spaces header toggle (legacy full shell)
 │   │   │   ├── BookingGroups.tsx    — three-column booking layout (legacy)
 │   │   │   └── PasswordInput.tsx    — password field with visibility toggle
@@ -247,8 +247,9 @@ thirdspaces/
 
 **src/app/dashboard/page.tsx**
 - Protected route (requires authentication)
-- Home hub: Find a space, My booking requests strip, List your space, Incoming requests strip
-- Bell icon links to `/host/requests`; optional pending count badges
+- Header: `LogoMark` badge avatar + capitalized username; messages, incoming-requests bell, and logout icons
+- Home hub: Find a space, My booking requests strip, Saved favorites, List your space, Incoming requests strip
+- Messages icon links to `/messages`; bell links to `/host/requests`; optional pending count badges
 
 **src/app/find/page.tsx**
 - Find mode: intro hub + results view (mirrors host layout)
@@ -360,9 +361,9 @@ thirdspaces/
 
 1. Borrower books from space detail → status `pending`
 2. Owner reviews on **/host/requests** or **/bookings/{id}** → `PATCH approve|reject`
-3. Both sign contract on `/bookings/{id}` → `PATCH sign`
-4. After visit → `POST /api/bookings/{id}/rate`
-5. Chat available at `/messages` via WebSocket
+3. Chat opens at `/messages` once approved (WebSocket per booking)
+4. Both sign contract on `/bookings/{id}` → `PATCH sign` (required for ratings)
+5. After visit → `POST /api/bookings/{id}/rate`
 
 ## Contextual Back Navigation (Host)
 
@@ -379,7 +380,7 @@ Implemented in `frontend/src/lib/hostNavigation.ts` via `space_id` query paramet
 ## Current Phase
 
 **Implemented:**
-- **Match for Space UI** — purple find theme (`#a166ff`), host cream theme (`#f7d58f`), IBM Plex Sans, landing login
+- **Match for Space UI** — purple find theme (`#a166ff`), host cream theme (`#ffbe68`), IBM Plex Sans, landing login
 - **Find/Host split** — `/dashboard` hub with request strips, `/find` (intro + results), `/host` (intro + `?view=listings`), `/host/requests`, `/find/requests`
 - **Contextual navigation** — `PageHeader` back arrows; `hostNavigation.ts` for incoming-requests back via `space_id`
 - **Space detail** — full list-a-space fields, photo placeholder, owner vs find accents

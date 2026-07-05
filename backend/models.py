@@ -54,7 +54,6 @@ class Space(Base):
     is_outdoor = Column(Boolean, nullable=True)
     category = Column(String(100), nullable=True)
     availability = Column(String(100), nullable=True)
-    deposit_needed = Column(Float, nullable=True)
     location = Column(String(255), nullable=True)
     description = Column(Text, nullable=True)
     rules = Column(Text, nullable=True)

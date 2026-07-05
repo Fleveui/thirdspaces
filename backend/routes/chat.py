@@ -1,8 +1,7 @@
 # Chat API Routes — WebSocket and conversation history
 
-import uuid
 from datetime import datetime
-from typing import Dict, List, Set
+from typing import Dict, List, Optional, Set
 
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect, status
 from pydantic import BaseModel
@@ -10,12 +9,35 @@ from sqlalchemy.orm import Session
 
 from database import SessionLocal, get_db
 from dependencies import get_current_user
-from models import Booking, Conversation, Message, Space, User
+from models import User
 from services.auth import verify_token
+from services.chat import (
+    create_message,
+    get_booking_chat_access,
+    get_messages_for_conversation,
+    list_conversations_for_user,
+)
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
 active_connections: Dict[str, Set[WebSocket]] = {}
+
+
+def create_ws_db() -> Session:
+    return SessionLocal()
+
+
+class ConversationResponse(BaseModel):
+    conversation_id: str
+    booking_id: str
+    space_name: str
+    space_location: Optional[str] = None
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
+    other_party_name: str
+    other_party_role: str
+    last_message_body: Optional[str] = None
+    last_message_at: Optional[datetime] = None
 
 
 class MessageResponse(BaseModel):
@@ -26,49 +48,12 @@ class MessageResponse(BaseModel):
     created_at: datetime
 
 
-def _get_or_create_conversation(booking_id: str, db: Session) -> Conversation:
-    conversation = db.query(Conversation).filter(Conversation.booking_id == booking_id).first()
-    if conversation:
-        return conversation
-    conversation = Conversation(id=uuid.uuid4().hex, booking_id=booking_id)
-    db.add(conversation)
-    db.commit()
-    db.refresh(conversation)
-    return conversation
-
-
-def _user_can_access_booking(user_id: str, booking: Booking, space: Space) -> bool:
-    return user_id in (booking.borrower_id, space.owner_id)
-
-
-def _booking_is_chat_eligible(booking: Booking) -> bool:
-    return booking.status == "approved"
-
-
-@router.get("/conversations", response_model=List[dict])
+@router.get("/conversations", response_model=List[ConversationResponse])
 def list_conversations(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    rows = (
-        db.query(Booking, Space, Conversation)
-        .join(Space, Booking.space_id == Space.id)
-        .outerjoin(Conversation, Conversation.booking_id == Booking.booking_id)
-        .filter(Booking.status == "approved")
-        .all()
-    )
-    result = []
-    for booking, space, conversation in rows:
-        if not _user_can_access_booking(user.id, booking, space):
-            continue
-        if not conversation:
-            conversation = _get_or_create_conversation(booking.booking_id, db)
-        result.append({
-            "conversation_id": conversation.id,
-            "booking_id": booking.booking_id,
-            "space_name": space.name,
-        })
-    return result
+    return list_conversations_for_user(user.id, db)
 
 
 @router.get("/{conversation_id}/messages", response_model=List[MessageResponse])
@@ -77,21 +62,11 @@ def get_messages(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    conversation = db.query(Conversation).filter(Conversation.id == conversation_id).first()
-    if not conversation:
+    messages, error = get_messages_for_conversation(conversation_id, user.id, db)
+    if error == "not_found":
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found")
-
-    booking = db.query(Booking).filter(Booking.booking_id == conversation.booking_id).first()
-    space = db.query(Space).filter(Space.id == booking.space_id).first()
-    if not booking or not space or not _user_can_access_booking(user.id, booking, space):
+    if error == "forbidden":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
-
-    messages = (
-        db.query(Message)
-        .filter(Message.conversation_id == conversation_id)
-        .order_by(Message.created_at.asc())
-        .all()
-    )
     return messages
 
 
@@ -107,19 +82,13 @@ async def chat_websocket(websocket: WebSocket, booking_id: str):
         await websocket.close(code=4001)
         return
 
-    db = SessionLocal()
+    db = create_ws_db()
     try:
-        booking = db.query(Booking).filter(Booking.booking_id == booking_id).first()
-        if not booking or not _booking_is_chat_eligible(booking):
+        conversation, error = get_booking_chat_access(booking_id, user_id, db)
+        if error:
             await websocket.close(code=4003)
             return
 
-        space = db.query(Space).filter(Space.id == booking.space_id).first()
-        if not space or not _user_can_access_booking(user_id, booking, space):
-            await websocket.close(code=4003)
-            return
-
-        conversation = _get_or_create_conversation(booking_id, db)
         await websocket.accept()
 
         if booking_id not in active_connections:
@@ -132,18 +101,18 @@ async def chat_websocket(websocket: WebSocket, booking_id: str):
                 if not data.strip():
                     continue
 
-                message = Message(
-                    id=uuid.uuid4().hex,
-                    conversation_id=conversation.id,
-                    sender_user_id=user_id,
-                    body=data.strip(),
+                message, msg_error = create_message(
+                    conversation.id,
+                    user_id,
+                    data,
+                    db,
                 )
-                db.add(message)
-                db.commit()
-                db.refresh(message)
+                if msg_error or not message:
+                    continue
 
                 payload = {
                     "id": message.id,
+                    "conversation_id": message.conversation_id,
                     "sender_user_id": message.sender_user_id,
                     "body": message.body,
                     "created_at": message.created_at.isoformat(),

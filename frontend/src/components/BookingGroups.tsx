@@ -8,7 +8,9 @@ import {
   exchangeOfferPreview,
   statusLabel,
   borrowerStatusMessage,
+  bookingChatEligible,
 } from '@/lib/bookings'
+import { messagesChatHref } from '@/lib/chat'
 
 export function OwnerBookingGroup({
   title,
@@ -51,6 +53,14 @@ export function OwnerBookingGroup({
                     </p>
                     <p className="text-xs text-primary mt-1">{statusLabel(booking.status)}</p>
                   </Link>
+                  {bookingChatEligible(booking) && (
+                    <Link
+                      href={messagesChatHref(booking.booking_id)}
+                      className="text-sm text-primary hover:underline"
+                    >
+                      Message
+                    </Link>
+                  )}
                   {showActions && onApprove && onReject && (
                     <div className="flex gap-2">
                       <button
@@ -82,12 +92,11 @@ export function OwnerBookingGroup({
 }
 
 export function BorrowerBookingRow({ booking }: { booking: BorrowerBooking }) {
+  const showMessage = bookingChatEligible(booking)
+
   return (
-    <Link
-      href={`/bookings/${booking.booking_id}`}
-      className="flex items-center justify-between gap-4 p-4 rounded-2xl border border-gray-100 bg-white hover:bg-primary-light/30 transition-colors"
-    >
-      <div className="min-w-0 flex-1">
+    <div className="flex items-center justify-between gap-4 p-4 rounded-2xl border border-gray-100 bg-white hover:bg-primary-light/30 transition-colors">
+      <Link href={`/bookings/${booking.booking_id}`} className="min-w-0 flex-1">
         <p className="font-medium text-dark truncate">{booking.space_name}</p>
         <p className="text-sm text-gray-600">
           {formatDateRange(booking.start_date, booking.end_date)}
@@ -97,11 +106,21 @@ export function BorrowerBookingRow({ booking }: { booking: BorrowerBooking }) {
             {borrowerStatusMessage(booking.status)}
           </p>
         )}
+      </Link>
+      <div className="flex flex-col items-end gap-2 shrink-0">
+        <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-primary-light text-primary">
+          {statusLabel(booking.status)}
+        </span>
+        {showMessage && (
+          <Link
+            href={messagesChatHref(booking.booking_id)}
+            className="text-xs text-primary hover:underline"
+          >
+            Message
+          </Link>
+        )}
       </div>
-      <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-primary-light text-primary shrink-0">
-        {statusLabel(booking.status)}
-      </span>
-    </Link>
+    </div>
   )
 }
 
@@ -121,21 +140,31 @@ export function BorrowerBookingGroup({
         <ul className="divide-y divide-gray-200">
           {bookings.map((booking) => (
             <li key={booking.booking_id} className="py-3 first:pt-0 last:pb-0">
-              <Link
-                href={`/bookings/${booking.booking_id}`}
-                className="block hover:bg-primary-light -mx-2 px-2 py-1 rounded-2xl transition-colors"
-              >
-                <p className="font-medium text-dark">{booking.space_name}</p>
-                <p className="text-sm text-gray-600">
-                  {formatDateRange(booking.start_date, booking.end_date)}
-                </p>
-                <p className="text-xs text-primary mt-1">{statusLabel(booking.status)}</p>
-                {borrowerStatusMessage(booking.status) && (
-                  <p className="text-sm text-gray-600 mt-1 italic">
-                    {borrowerStatusMessage(booking.status)}
+              <div className="flex flex-col gap-2">
+                <Link
+                  href={`/bookings/${booking.booking_id}`}
+                  className="block hover:bg-primary-light -mx-2 px-2 py-1 rounded-2xl transition-colors"
+                >
+                  <p className="font-medium text-dark">{booking.space_name}</p>
+                  <p className="text-sm text-gray-600">
+                    {formatDateRange(booking.start_date, booking.end_date)}
                   </p>
+                  <p className="text-xs text-primary mt-1">{statusLabel(booking.status)}</p>
+                  {borrowerStatusMessage(booking.status) && (
+                    <p className="text-sm text-gray-600 mt-1 italic">
+                      {borrowerStatusMessage(booking.status)}
+                    </p>
+                  )}
+                </Link>
+                {bookingChatEligible(booking) && (
+                  <Link
+                    href={messagesChatHref(booking.booking_id)}
+                    className="text-sm text-primary hover:underline"
+                  >
+                    Message
+                  </Link>
                 )}
-              </Link>
+              </div>
             </li>
           ))}
         </ul>

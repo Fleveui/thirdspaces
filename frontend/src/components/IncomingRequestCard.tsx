@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { OwnerBooking, formatDateRange, exchangeOfferPreview } from '@/lib/bookings'
+import { accentClasses } from '@/lib/theme'
 
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/)
@@ -30,6 +31,7 @@ export function IncomingRequestCard({
   onReject,
   actionBookingId,
 }: IncomingRequestCardProps) {
+  const host = accentClasses('host')
   const preview = exchangeOfferPreview(booking.exchange_offer, 100)
   const isPending = booking.status === 'pending'
 
@@ -47,7 +49,7 @@ export function IncomingRequestCard({
                 <p className="text-sm text-gray-500">{booking.space_name}</p>
               </div>
               {isPending && (
-                <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-host-cream/60 text-host-cream-accent shrink-0">
+                <span className={`text-xs font-medium px-2.5 py-1 rounded-full shrink-0 ${host.categoryBadge}`}>
                   Pending
                 </span>
               )}

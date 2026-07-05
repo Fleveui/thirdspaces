@@ -40,7 +40,6 @@ export interface SpaceListing {
   is_outdoor: boolean | null
   category: string | null
   availability: string | null
-  deposit_needed: number | null
   max_people: number | null
   location: string | null
   description: string | null

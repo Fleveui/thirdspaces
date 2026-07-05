@@ -62,12 +62,12 @@ chmod +x start.sh stop.sh  # Make scripts executable (first time only)
 1. **Landing:** Open http://localhost:3000 — splash with inline **login** and **join us!** (`/login` redirects here)
 2. **Register:** Click **join us!**, fill in the form, select account type
 3. **Log in:** Use your credentials (or seed user `demoowner` / `secret12` after running `python3 seed_data.py` in `backend/`)
-4. **Home hub:** After login you land on `/dashboard` — **Find a space**, **My booking requests**, **List your space**, and **Incoming requests** strips
+4. **Home hub:** After login you land on `/dashboard` — header shows your username with the app logo as a profile badge; **Find a space**, **My booking requests**, **Saved favorites**, **List your space**, and **Incoming requests** strips; messages and notification icons in the header
 5. **Find mode (`/find`):** Intro → **Browse all spaces** for results. Purple theme. Own listings hidden from search. **My booking requests** at `/find/requests`
 6. **Host mode (`/host`):** Intro → **View my listings** (`/host?view=listings`). Cream theme. Listing rows show booking request badges (not "Available now"). **Incoming requests** at `/host/requests`
 7. **Own listing detail:** From My spaces → open a listing. Shows all list-a-space fields, photo placeholder, request strip above photo. Back → listings view
 8. **List a space (`/spaces/new`):** Cream chip-based form with exchange preferences
-9. **Book → approve → sign → chat:** Book from a space detail page; owner approves on `/host/requests`; both sign on booking detail; chat at `/messages`
+9. **Book → approve → chat:** Book from a space detail page; owner approves on `/host/requests`; chat opens at `/messages`. Both parties sign the contract on booking detail before ratings.
 
 **Navigation tips (host):**
 - Dashboard → Incoming requests → back goes to **dashboard**
@@ -96,7 +96,7 @@ When done, press `Ctrl + C` in Terminal, or in a new Terminal window run:
 | What | URL | Purpose |
 |------|-----|---------|
 | App | http://localhost:3000 | Landing + login |
-| Home hub | http://localhost:3000/dashboard | Find a space, booking strips, List your space |
+| Home hub | http://localhost:3000/dashboard | Logo avatar + username; Find, booking strips, List your space, messages icon |
 | Find mode | http://localhost:3000/find | Browse and book spaces (own listings hidden) |
 | My booking requests | http://localhost:3000/find/requests | Borrower's outgoing requests |
 | Host mode | http://localhost:3000/host | My spaces intro hub |
@@ -214,7 +214,7 @@ The frontend is branded **Match for Space** with two accent themes:
 - Used on `/find`, `/find/requests`, and space detail when browsing others' listings
 
 **Host (owner) — cream**
-- Base: `#f7d58f` (`host-cream`), accent text: `#8b6018`
+- Base: `#ffbe68` (`host-cream`), accent text: `#9a5516`
 - Inputs: `input-cream`, buttons: `btn-host` / `btn-host-outline`
 - Used on `/host`, `/host/requests`, `/spaces/new`, and own-listing detail views
 

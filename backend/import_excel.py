@@ -101,7 +101,7 @@ def import_spaces(db: Session):
     """
     Import spaces from Excel sheet 'space'
     
-    Excel columns: ID, NAME, OWNER, M2, OUTDOOR/INDOOR, CATEGORY, AVAILABILITY, DEPOSIT NEEDED, LOCATION
+    Excel columns: ID, NAME, OWNER, M2, OUTDOOR/INDOOR, CATEGORY, AVAILABILITY, LOCATION
     Maps to: Space table
     """
     print("📥 Importing spaces...")
@@ -128,7 +128,6 @@ def import_spaces(db: Session):
             is_outdoor=is_outdoor,
             category=str(row.get('CATEGORY', '')).strip() if pd.notna(row.get('CATEGORY')) else None,
             availability=str(row.get('AVAILABILITY', '')).strip() if pd.notna(row.get('AVAILABILITY')) else None,
-            deposit_needed=float(row['DEPOSIT NEEDED ']) if pd.notna(row.get('DEPOSIT NEEDED ')) else None,
             location=str(row.get('LOCATION', '')).strip() if pd.notna(row.get('LOCATION')) else None,
             created_at=datetime.utcnow()
         )
