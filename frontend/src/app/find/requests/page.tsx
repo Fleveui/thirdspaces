@@ -44,67 +44,34 @@ function FindRequestsContent() {
     if (token) fetchBookings()
   }, [token, fetchBookings])
 
-  const pending = bookings.filter((b) => b.status === 'pending')
-  const confirmed = bookings.filter((b) => b.status === 'approved')
-  const past = bookings.filter((b) => b.status === 'rejected')
-
   return (
     <AppShell mode="find" variant="minimal">
       <div className="max-w-xl mx-auto">
         <PageHeader title="My booking requests" onBack={() => router.push('/dashboard')} />
 
-        <p className="text-gray-500 text-sm text-center mb-8">
-          Spaces you have requested will appear here.
-        </p>
-
-        {loading ? (
-          <p className="text-gray-600 text-sm text-center py-8">Loading your bookings...</p>
-        ) : error ? (
-          <p className="text-red-600 text-sm text-center py-8">{error}</p>
-        ) : bookings.length === 0 ? (
-          <p className="text-gray-600 text-sm text-center py-8">
-            No bookings yet.{' '}
-            <Link href="/find" className="text-primary hover:underline">
-              Browse spaces to get started.
-            </Link>
-          </p>
-        ) : (
-          <div className="space-y-6">
-            {pending.length > 0 && (
-              <section className="space-y-3">
-                {pending.map((booking) => (
-                  <MyBookingRequestCard key={booking.booking_id} booking={booking} />
-                ))}
-              </section>
-            )}
-
-            {confirmed.length > 0 && (
-              <section>
-                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
-                  Confirmed
-                </h3>
-                <div className="space-y-3">
-                  {confirmed.map((booking) => (
-                    <MyBookingRequestCard key={booking.booking_id} booking={booking} />
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {past.length > 0 && (
-              <section>
-                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
-                  Past
-                </h3>
-                <div className="space-y-3">
-                  {past.map((booking) => (
-                    <MyBookingRequestCard key={booking.booking_id} booking={booking} />
-                  ))}
-                </div>
-              </section>
-            )}
-          </div>
-        )}
+        <section className="rounded-3xl bg-gradient-to-br from-primary to-primary-dark p-5 mb-6">
+          <h2 className="font-semibold text-white mb-4">My booking requests</h2>
+          {loading ? (
+            <p className="text-white/80 text-sm">Loading your bookings...</p>
+          ) : error ? (
+            <p className="text-red-100 text-sm">{error}</p>
+          ) : bookings.length === 0 ? (
+            <p className="text-white/80 text-sm">
+              No bookings yet.{' '}
+              <Link href="/find" className="text-white underline hover:no-underline">
+                Browse spaces to get started.
+              </Link>
+            </p>
+          ) : (
+            <ul className="space-y-3">
+              {bookings.map((booking) => (
+                <li key={booking.booking_id}>
+                  <MyBookingRequestCard booking={booking} />
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
       </div>
     </AppShell>
   )

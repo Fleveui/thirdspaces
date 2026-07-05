@@ -10,6 +10,7 @@ from routes.auth import router as auth_router
 from routes.spaces import router as spaces_router
 from routes.bookings import router as bookings_router
 from routes.chat import router as chat_router
+from routes.favorites import router as favorites_router
 import config
 
 UPLOAD_DIR = Path(__file__).resolve().parent / "uploads"
@@ -35,6 +36,7 @@ app.include_router(auth_router)
 app.include_router(spaces_router)
 app.include_router(bookings_router)
 app.include_router(chat_router)
+app.include_router(favorites_router)
 
 
 @app.get("/")

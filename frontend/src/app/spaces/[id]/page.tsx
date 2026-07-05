@@ -10,9 +10,11 @@ import { useParams, useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth'
 import { countBookingsBySpace, OwnerBooking } from '@/lib/bookings'
 import { hostRequestsHref } from '@/lib/hostNavigation'
+import { addFavorite, fetchFavoriteStatus, removeFavorite } from '@/lib/favorites'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
 import { AppShell } from '@/components/AppShell'
 import { PageHeader } from '@/components/PageHeader'
+import { BookmarkButton } from '@/components/BookmarkButton'
 import {
   SpaceListing,
   resolveImageUrl,
@@ -101,6 +103,7 @@ function SpaceDetailContent() {
 
   const [space, setSpace] = useState<SpaceListing | null>(null)
   const [requestCount, setRequestCount] = useState(0)
+  const [isFavorite, setIsFavorite] = useState(false)
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -163,6 +166,37 @@ function SpaceDetailContent() {
 
     fetchRequestCount()
   }, [apiUrl, authFetch, id, user, space])
+
+  useEffect(() => {
+    if (!user || !space || user.id === space.owner_id) {
+      setIsFavorite(false)
+      return
+    }
+
+    const loadFavorite = async () => {
+      try {
+        setIsFavorite(await fetchFavoriteStatus(authFetch, apiUrl, id))
+      } catch {
+        setIsFavorite(false)
+      }
+    }
+
+    loadFavorite()
+  }, [apiUrl, authFetch, id, user, space])
+
+  const handleToggleFavorite = async () => {
+    try {
+      if (isFavorite) {
+        await removeFavorite(authFetch, apiUrl, id)
+        setIsFavorite(false)
+      } else {
+        await addFavorite(authFetch, apiUrl, id)
+        setIsFavorite(true)
+      }
+    } catch {
+      // keep current state on error
+    }
+  }
 
   const handleBookSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -244,6 +278,16 @@ function SpaceDetailContent() {
         <PageHeader
           title={pageTitle}
           onBack={() => router.push(backHref)}
+          rightAction={
+            !loading && space && !isOwnSpace ? (
+              <BookmarkButton
+                filled={isFavorite}
+                onClick={() => handleToggleFavorite()}
+                className="w-10 h-10 rounded-full border border-gray-200 flex items-center justify-center text-primary hover:bg-primary-light/60"
+                size={20}
+              />
+            ) : undefined
+          }
         />
 
         {loading ? (

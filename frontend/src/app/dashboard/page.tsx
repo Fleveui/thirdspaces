@@ -12,6 +12,7 @@ import {
   HubActionCard,
   IncomingRequestsStrip,
   MyBookingRequestsStrip,
+  SavedFavoritesStrip,
 } from '@/components/HubActionCard'
 import { SparkleIcon } from '@/components/SparkleIcon'
 import { useAuth } from '@/lib/auth'
@@ -29,17 +30,21 @@ function HubContent() {
 
   const [pendingHostCount, setPendingHostCount] = useState(0)
   const [pendingFindCount, setPendingFindCount] = useState(0)
+  const [favoritesCount, setFavoritesCount] = useState(0)
 
   useEffect(() => {
     if (!token) return
 
     const loadCounts = async () => {
       try {
-        const [hostRes, findRes] = await Promise.all([
+        const [hostRes, findRes, favRes] = await Promise.all([
           fetch(`${apiUrl}/api/bookings/mine`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
           fetch(`${apiUrl}/api/bookings/my-requests`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          fetch(`${apiUrl}/api/favorites`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
         ])
@@ -52,6 +57,11 @@ function HubContent() {
         if (findRes.ok) {
           const data = await findRes.json()
           setPendingFindCount(data.filter((b: { status: string }) => b.status === 'pending').length)
+        }
+
+        if (favRes.ok) {
+          const data = await favRes.json()
+          setFavoritesCount(data.length)
         }
       } catch {
         // Badge counts are optional
@@ -106,6 +116,7 @@ function HubContent() {
         <div className="space-y-4">
           <HubActionCard variant="find" href="/find" />
           <MyBookingRequestsStrip href="/find/requests" count={pendingFindCount} />
+          <SavedFavoritesStrip href="/find/favorites" count={favoritesCount} />
           <HubActionCard variant="host" href="/host" />
           <IncomingRequestsStrip href="/host/requests" count={pendingHostCount} />
         </div>

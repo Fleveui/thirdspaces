@@ -9,7 +9,7 @@
 #   - booking: booking requests and their status
 #   - space_photo: photos/images of spaces
 
-from sqlalchemy import Column, String, DateTime, Enum as SQLEnum, Float, Integer, Boolean, create_engine, Text
+from sqlalchemy import Column, String, DateTime, Enum as SQLEnum, Float, Integer, Boolean, create_engine, Text, UniqueConstraint
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime
@@ -152,6 +152,23 @@ class Rating(Base):
     rating = Column(Integer, nullable=False)
     comment = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class SpaceFavorite(Base):
+    """User-saved favorite space for Find mode."""
+    __tablename__ = "space_favorite"
+    __table_args__ = (
+        UniqueConstraint("user_id", "space_id", name="uq_user_space_favorite"),
+        {'extend_existing': True},
+    )
+
+    id = Column(String, primary_key=True, default=lambda: __import__('uuid').uuid4().hex)
+    user_id = Column(String, nullable=False, index=True)
+    space_id = Column(String, nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    def __repr__(self):
+        return f"<SpaceFavorite user={self.user_id} space={self.space_id}>"
 
 
 def init_db():

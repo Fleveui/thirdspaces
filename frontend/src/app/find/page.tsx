@@ -16,6 +16,13 @@ import { FilterPanel } from '@/components/FilterPanel'
 import { SparkleIcon } from '@/components/SparkleIcon'
 import { MyBookingRequestCard } from '@/components/MyBookingRequestCard'
 import { BorrowerBooking } from '@/lib/bookings'
+import { useAuth } from '@/lib/auth'
+import {
+  fetchFavorites,
+  addFavorite,
+  removeFavorite,
+  favoriteIdsFromList,
+} from '@/lib/favorites'
 import {
   SPACE_CATEGORIES,
   SpaceListing,
@@ -28,12 +35,14 @@ type FindView = 'intro' | 'results'
 
 function FindContent() {
   const router = useRouter()
+  const { authFetch } = useAuth()
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
   const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null
 
   const [view, setView] = useState<FindView>('intro')
   const [spaces, setSpaces] = useState<SpaceListing[]>([])
   const [borrowerBookings, setBorrowerBookings] = useState<BorrowerBooking[]>([])
+  const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(false)
   const [borrowerLoading, setBorrowerLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -90,6 +99,41 @@ function FindContent() {
   useEffect(() => {
     if (token) fetchBorrowerBookings()
   }, [token, fetchBorrowerBookings])
+
+  const fetchFavoriteIds = useCallback(async () => {
+    if (!token) return
+    try {
+      const favorites = await fetchFavorites(authFetch, apiUrl)
+      setFavoriteIds(favoriteIdsFromList(favorites))
+    } catch {
+      setFavoriteIds(new Set())
+    }
+  }, [apiUrl, authFetch, token])
+
+  useEffect(() => {
+    if (view === 'results' && token) {
+      fetchFavoriteIds()
+    }
+  }, [view, token, fetchFavoriteIds])
+
+  const toggleFavorite = async (spaceId: string) => {
+    const isFav = favoriteIds.has(spaceId)
+    try {
+      if (isFav) {
+        await removeFavorite(authFetch, apiUrl, spaceId)
+        setFavoriteIds((prev) => {
+          const next = new Set(prev)
+          next.delete(spaceId)
+          return next
+        })
+      } else {
+        await addFavorite(authFetch, apiUrl, spaceId)
+        setFavoriteIds((prev) => new Set(prev).add(spaceId))
+      }
+    } catch {
+      // ignore toggle errors on card
+    }
+  }
 
   const goToResults = (category?: string) => {
     if (category !== undefined) {
@@ -198,7 +242,14 @@ function FindContent() {
           ) : (
             <div className="space-y-3 mb-10 max-w-xl mx-auto">
               {spaces.map((space) => (
-                <SpaceCard key={space.id} space={space} apiUrl={apiUrl} layout="row" />
+                <SpaceCard
+                  key={space.id}
+                  space={space}
+                  apiUrl={apiUrl}
+                  layout="row"
+                  isFavorite={favoriteIds.has(space.id)}
+                  onToggleFavorite={() => toggleFavorite(space.id)}
+                />
               ))}
             </div>
           )}

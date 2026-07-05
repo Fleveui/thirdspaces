@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { SpaceListing, resolveImageUrl, availabilityBadge } from '@/lib/spaces'
 import { hostRequestsHref } from '@/lib/hostNavigation'
+import { BookmarkButton } from '@/components/BookmarkButton'
 
 interface SpaceCardProps {
   space: SpaceListing
@@ -10,6 +11,8 @@ interface SpaceCardProps {
   layout?: 'card' | 'row'
   accent?: 'find' | 'host'
   requestCount?: number
+  isFavorite?: boolean
+  onToggleFavorite?: () => void
 }
 
 export function SpaceCard({
@@ -18,6 +21,8 @@ export function SpaceCard({
   layout = 'card',
   accent = 'find',
   requestCount,
+  isFavorite = false,
+  onToggleFavorite,
 }: SpaceCardProps) {
   const img = resolveImageUrl(space.image_url, apiUrl)
   const badge = availabilityBadge(space.availability)
@@ -92,6 +97,18 @@ export function SpaceCard({
             </svg>
             {requestCount} {requestCount === 1 ? 'request' : 'requests'}
           </Link>
+        )}
+        {onToggleFavorite && (
+          <BookmarkButton
+            filled={isFavorite}
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              onToggleFavorite()
+            }}
+            className="shrink-0 self-center w-10 h-10 rounded-full hover:bg-primary-light/60 text-primary"
+            size={20}
+          />
         )}
       </div>
     )
