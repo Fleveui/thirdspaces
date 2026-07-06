@@ -47,6 +47,8 @@ export interface SpaceListing {
   exchange_preferences: string | null
   image_url: string | null
   photos?: SpacePhoto[]
+  avg_rating?: number | null
+  rating_count?: number
 }
 
 export interface SpaceFilters {

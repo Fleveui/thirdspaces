@@ -15,6 +15,7 @@ import { ProtectedRoute } from '@/components/ProtectedRoute'
 import { AppShell } from '@/components/AppShell'
 import { PageHeader } from '@/components/PageHeader'
 import { BookmarkButton } from '@/components/BookmarkButton'
+import { StarRating } from '@/components/StarRating'
 import {
   SpaceListing,
   resolveImageUrl,
@@ -247,6 +248,7 @@ function SpaceDetailContent() {
   const shellMode = isOwnSpace ? 'host' : 'find'
   const accent = isOwnSpace ? 'host' : 'find'
   const theme = accentClasses(accent)
+  const showRating = Boolean(space && (space.rating_count ?? 0) > 0 && space.avg_rating != null)
   const backHref = isOwnSpace ? '/host?view=listings' : '/find'
 
   const pageTitle = loading ? 'Space details' : notFound ? 'Not found' : space?.name ?? 'Space details'
@@ -332,7 +334,19 @@ function SpaceDetailContent() {
             )}
 
             <div className={`${panelClass()} mb-6`}>
-              <h1 className="text-xl font-bold text-dark mb-4">{space.name}</h1>
+              <h1 className="text-xl font-bold text-dark mb-2">{space.name}</h1>
+              {showRating && (
+                <div className="mb-4">
+                  <StarRating
+                    value={space.avg_rating!}
+                    readOnly
+                    compact
+                    accent={accent}
+                    size={16}
+                    ratingCount={space.rating_count}
+                  />
+                </div>
+              )}
 
               <div className="space-y-5">
                 <DetailField label="Location">

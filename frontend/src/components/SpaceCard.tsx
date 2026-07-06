@@ -5,6 +5,7 @@ import { SpaceListing, resolveImageUrl, availabilityBadge } from '@/lib/spaces'
 import { hostRequestsHref } from '@/lib/hostNavigation'
 import { accentClasses } from '@/lib/theme'
 import { BookmarkButton } from '@/components/BookmarkButton'
+import { StarRating } from '@/components/StarRating'
 
 interface SpaceCardProps {
   space: SpaceListing
@@ -28,6 +29,7 @@ export function SpaceCard({
   const img = resolveImageUrl(space.image_url, apiUrl)
   const badge = availabilityBadge(space.availability)
   const theme = accentClasses(accent)
+  const showRating = (space.rating_count ?? 0) > 0 && space.avg_rating != null
 
   if (layout === 'row') {
     const showRequestBadge = requestCount !== undefined && requestCount > 0
@@ -45,6 +47,16 @@ export function SpaceCard({
           </div>
           <div className="flex-1 min-w-0 py-0.5">
             <h2 className="font-bold text-dark leading-tight truncate">{space.name}</h2>
+            {showRating && (
+              <StarRating
+                value={space.avg_rating!}
+                readOnly
+                compact
+                accent={accent}
+                size={14}
+                ratingCount={space.rating_count}
+              />
+            )}
             <p className="text-sm text-gray-500 flex items-center gap-1 mt-0.5 truncate">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0">
                 <path d="M12 21s-7-4.5-7-10a7 7 0 1114 0c0 5.5-7 10-7 10z" />
@@ -127,6 +139,18 @@ export function SpaceCard({
         <div className="flex justify-between items-start gap-2 mb-1">
           <h2 className="font-bold text-dark leading-tight">{space.name}</h2>
         </div>
+        {showRating && (
+          <div className="mb-2">
+            <StarRating
+              value={space.avg_rating!}
+              readOnly
+              compact
+              accent={accent}
+              size={14}
+              ratingCount={space.rating_count}
+            />
+          </div>
+        )}
         <p className="text-sm text-gray-500 flex items-center gap-1 mb-3">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0">
             <path d="M12 21s-7-4.5-7-10a7 7 0 1114 0c0 5.5-7 10-7 10z" />

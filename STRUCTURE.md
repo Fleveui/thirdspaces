@@ -79,6 +79,8 @@ thirdspaces/
 │   │   │   ├── SpaceCard.tsx        — listing card/row (find or host accent; request badge on host)
 │   │   │   ├── IncomingRequestCard.tsx — host incoming request card (cream/green/red status)
 │   │   │   ├── MyBookingRequestCard.tsx — borrower booking request card (find accent)
+│   │   │   ├── RatingPanel.tsx        — post-visit star rating (booking detail)
+│   │   │   ├── StarRating.tsx         — SparkleIcon star row (ratings + listing cards)
 │   │   │   ├── CategoryChips.tsx    — category selector (find or host variant)
 │   │   │   ├── FilterPanel.tsx      — find-mode filter panel
 │   │   │   ├── SearchBar.tsx        — find-mode search input
@@ -181,7 +183,7 @@ thirdspaces/
 **services/bookings.py**
 - Business logic for full booking lifecycle
 - `create_booking()`, `list_bookings_for_owner()`, `list_bookings_for_borrower()`
-- Approve/reject, contract generation and signing, ratings
+- Approve/reject, contract generation and signing, post-visit ratings (after `end_date`, approved)
 
 **services/auth.py**
 - Business logic for authentication
@@ -194,6 +196,7 @@ thirdspaces/
 - `create_space()` — validates fields, sets `owner_id` from authenticated `users.id`
 - `search_spaces(exclude_owner_id)` — filterable search for Find mode
 - `list_spaces_by_owner()` — returns spaces for the current owner, newest first
+- `_space_rating_stats()` — avg borrower visit rating per listing (`avg_rating`, `rating_count` on API payloads)
 
 **import_excel.py**
 - Standalone script to import data from Excel file
@@ -362,8 +365,7 @@ thirdspaces/
 1. Borrower books from space detail → status `pending`
 2. Owner reviews on **/host/requests** or **/bookings/{id}** → `PATCH approve|reject`
 3. Chat opens at `/messages` once approved (WebSocket per booking)
-4. Both sign contract on `/bookings/{id}` → `PATCH sign` (required for ratings)
-5. After visit → `POST /api/bookings/{id}/rate`
+4. After visit ends → star rating on `/bookings/{id}`; optional contract sign on same page
 
 ## Contextual Back Navigation (Host)
 

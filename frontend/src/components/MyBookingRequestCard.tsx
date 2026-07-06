@@ -6,6 +6,7 @@ import {
   formatDateRange,
   exchangeOfferPreview,
   statusLabel,
+  needsRating,
 } from '@/lib/bookings'
 
 function spaceInitials(name: string): string {
@@ -48,6 +49,11 @@ export function MyBookingRequestCard({ booking }: MyBookingRequestCardProps) {
                 {statusLabel(booking.status)}
               </span>
             </div>
+            {needsRating(booking) && (
+              <span className="inline-block mt-2 text-xs font-medium px-2.5 py-1 rounded-full bg-amber-50 text-amber-700">
+                Rate your visit
+              </span>
+            )}
             <p className="text-sm text-gray-500 mt-2 flex items-center gap-1.5">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <rect x="3" y="4" width="18" height="18" rx="2" />

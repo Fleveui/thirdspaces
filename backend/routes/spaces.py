@@ -61,6 +61,8 @@ class SpaceResponse(BaseModel):
     max_people: Optional[int] = None
     image_url: Optional[str] = None
     photos: Optional[List[SpacePhotoItem]] = None
+    avg_rating: Optional[float] = None
+    rating_count: int = 0
 
     class Config:
         from_attributes = True

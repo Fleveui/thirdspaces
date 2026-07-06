@@ -1,5 +1,9 @@
 """API tests for spaces routes."""
 
+from datetime import datetime, timedelta
+import uuid
+
+from models import Booking, PersonalAccount, Rating, Space
 from tests.conftest import auth_headers, login_user, register_user
 
 
@@ -249,3 +253,111 @@ class TestCreateSpace:
 
         assert response.status_code == 201
         assert response.json()["owner_id"] == owner_id
+
+
+class TestSpaceRatingAggregates:
+    def _seed_rated_space(self, db, owner_id, borrower_id, borrower_rating, owner_rating=None):
+        space_id = uuid.uuid4().hex
+        space = Space(
+            id=space_id,
+            name="Rated Loft",
+            owner_id=owner_id,
+            area_m2=90.0,
+            category="Loft",
+            location="Bolzano",
+        )
+        borrower = PersonalAccount(
+            id=borrower_id,
+            name="Guest",
+            surname="User",
+            email=f"{borrower_id}@example.com",
+        )
+        db.add(space)
+        db.add(borrower)
+        db.flush()
+
+        start = datetime.utcnow() - timedelta(days=14)
+        end = datetime.utcnow() - timedelta(days=7)
+        booking_id = uuid.uuid4().hex
+        booking = Booking(
+            booking_id=booking_id,
+            space_id=space_id,
+            borrower_id=borrower_id,
+            start_date=start,
+            end_date=end,
+            status="approved",
+            intended_use="Workshop",
+        )
+        db.add(booking)
+        db.flush()
+
+        db.add(Rating(
+            id=uuid.uuid4().hex,
+            booking_id=booking_id,
+            rater_user_id=borrower_id,
+            rating=borrower_rating,
+        ))
+        if owner_rating is not None:
+            db.add(Rating(
+                id=uuid.uuid4().hex,
+                booking_id=booking_id,
+                rater_user_id=owner_id,
+                rating=owner_rating,
+            ))
+        db.commit()
+        return space_id
+
+    def test_space_list_includes_borrower_rating_average(self, client, db):
+        register_user(
+            client,
+            username="ratedowner",
+            email="ratedowner@example.com",
+            password="secret12",
+            account_type="space_owner",
+        )
+        owner_token = login_user(client, "ratedowner", "secret12").json()["token"]
+        owner_id = client.get("/api/auth/me", headers=auth_headers(owner_token)).json()["id"]
+
+        space_id = self._seed_rated_space(db, owner_id, "borrower-a", borrower_rating=5)
+
+        list_response = client.get("/api/spaces")
+        assert list_response.status_code == 200
+        space = next(s for s in list_response.json() if s["id"] == space_id)
+        assert space["avg_rating"] == 5.0
+        assert space["rating_count"] == 1
+
+        detail_response = client.get(f"/api/spaces/{space_id}")
+        assert detail_response.status_code == 200
+        assert detail_response.json()["avg_rating"] == 5.0
+        assert detail_response.json()["rating_count"] == 1
+
+    def test_owner_rating_does_not_affect_space_average(self, client, db):
+        register_user(
+            client,
+            username="ratedowner2",
+            email="ratedowner2@example.com",
+            password="secret12",
+            account_type="space_owner",
+        )
+        owner_token = login_user(client, "ratedowner2", "secret12").json()["token"]
+        owner_id = client.get("/api/auth/me", headers=auth_headers(owner_token)).json()["id"]
+
+        space_id = self._seed_rated_space(
+            db, owner_id, "borrower-b", borrower_rating=4, owner_rating=1
+        )
+
+        detail = client.get(f"/api/spaces/{space_id}").json()
+        assert detail["avg_rating"] == 4.0
+        assert detail["rating_count"] == 1
+
+    def test_space_without_ratings_returns_zero_count(self, client, space_owner_token):
+        create_response = client.post(
+            "/api/spaces",
+            json=valid_space_payload(name="Unrated Space"),
+            headers=auth_headers(space_owner_token),
+        )
+        space_id = create_response.json()["id"]
+
+        detail = client.get(f"/api/spaces/{space_id}").json()
+        assert detail["avg_rating"] is None
+        assert detail["rating_count"] == 0

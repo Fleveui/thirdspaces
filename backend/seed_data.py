@@ -4,7 +4,7 @@
 
 from datetime import datetime, timedelta
 from database import SessionLocal
-from models import Space, Booking, PersonalAccount, User, AccountType
+from models import Space, Booking, PersonalAccount, User, AccountType, Rating
 from services.auth import hash_password
 from services.bookings import _generate_contract_text
 import uuid
@@ -15,6 +15,7 @@ def seed_database():
     
     try:
         # Clear existing data
+        db.query(Rating).delete()
         db.query(Booking).delete()
         db.query(Space).delete()
         db.query(PersonalAccount).delete()
@@ -191,7 +192,7 @@ def seed_database():
         db.commit()
         print(f"✅ Created {len(created_spaces)} spaces (3 demoowner, 6 other owner)")
         
-        # Create demo personal account (borrower)
+        # Create demo personal accounts (borrowers)
         borrower = PersonalAccount(
             id=str(uuid.uuid4().hex),
             name="Lena",
@@ -200,9 +201,27 @@ def seed_database():
             password_hash=None,
             created_at=datetime.utcnow()
         )
+        borrower2 = PersonalAccount(
+            id=str(uuid.uuid4().hex),
+            name="Tom",
+            surname="Bauer",
+            email="tom@example.com",
+            password_hash=None,
+            created_at=datetime.utcnow()
+        )
+        borrower3 = PersonalAccount(
+            id=str(uuid.uuid4().hex),
+            name="Sara",
+            surname="Conti",
+            email="sara@example.com",
+            password_hash=None,
+            created_at=datetime.utcnow()
+        )
         db.add(borrower)
+        db.add(borrower2)
+        db.add(borrower3)
         db.commit()
-        print("✅ Created 1 personal account (borrower)")
+        print("✅ Created 3 personal accounts (borrowers)")
         
         # Create demo bookings on owner1 spaces with mixed statuses
         owner1_spaces = [space for space in created_spaces if space.owner_id == owner1_id]
@@ -231,6 +250,52 @@ def seed_database():
 
         db.commit()
         print("✅ Created 3 demo bookings (pending, approved, rejected)")
+
+        # Past approved bookings + borrower ratings on owner2 spaces (visible in Find)
+        owner2_spaces = {s.name: s for s in created_spaces if s.owner_id == owner2_id}
+        rating_specs = [
+            # (space_name, borrower, ratings list of (score, comment))
+            ("Alpine Loft - Centro", borrower, [(5, "Beautiful light and very welcoming host."), (4, "Great workshop space.")]),
+            ("Walther Terrace", borrower2, [(5, "Perfect summer evening spot.")]),
+            ("Makers Studio - Oltrisarco", borrower, [(4, "Well equipped studio.")]),
+            ("Community Garden - Europa", borrower3, [(3, "Lovely garden, a bit muddy after rain."), (5, "Amazing community vibe.")]),
+            ("Creative Studio - Gries", borrower2, [(4, "Good acoustics for rehearsals.")]),
+        ]
+
+        rating_count = 0
+        for space_name, guest, ratings in rating_specs:
+            space = owner2_spaces.get(space_name)
+            if not space:
+                continue
+            for i, (score, comment) in enumerate(ratings):
+                start = datetime.utcnow() - timedelta(days=30 + i * 14)
+                end = datetime.utcnow() - timedelta(days=20 + i * 14)
+                booking = Booking(
+                    booking_id=str(uuid.uuid4().hex),
+                    space_id=space.id,
+                    borrower_id=guest.id,
+                    start_date=start,
+                    end_date=end,
+                    status="approved",
+                    exchange_offer="Community workshop and skill-sharing session.",
+                    intended_use="Community event",
+                    created_at=start,
+                )
+                booking.contract_text = _generate_contract_text(space, booking)
+                db.add(booking)
+                db.flush()
+                db.add(Rating(
+                    id=str(uuid.uuid4().hex),
+                    booking_id=booking.booking_id,
+                    rater_user_id=guest.id,
+                    rating=score,
+                    comment=comment,
+                    created_at=end + timedelta(days=1),
+                ))
+                rating_count += 1
+
+        db.commit()
+        print(f"✅ Created past bookings with {rating_count} visit ratings on Find listings")
         
         print("\n" + "="*60)
         print("✅ Database seeding completed!")

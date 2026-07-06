@@ -569,11 +569,14 @@
 ```
 1. Owner approves booking → PATCH /api/bookings/{id}/approve
    ↓
-2. Both parties open /bookings/{id}
+2. Chat opens at /messages (approved bookings)
    ↓
-3. Contract text shown; each signs via PATCH /api/bookings/{id}/sign
+3. Optional: both parties sign contract on /bookings/{id} via PATCH sign
    ↓
-4. After visit: POST /api/bookings/{id}/rate (borrower or owner)
+4. After visit ends: star rating panel on /bookings/{id} (POST /api/bookings/{id}/rate)
+   Borrower rates the stay; owner rates the guest. One rating per party per booking.
+   ↓
+5. Borrower ratings aggregate to avg_rating on GET /api/spaces (SparkleIcon on SpaceCard)
 ```
 
 ## Data Flow: Real-time Chat
@@ -669,9 +672,11 @@ The UI is branded **Match for Space** with dual accents: purple for **Find** and
 - `AppShell` — `mode` (find | host), `variant` (full | minimal)
 - `HubActionCard` — dashboard mode cards and request strips (`SavedFavoritesStrip`)
 - `BookmarkButton` — toggle save on find SpaceCard rows and space detail
-- `SpaceCard` — listing card/row with find or host accent; request badge on host listings
+- `SpaceCard` — listing card/row with find or host accent; request badge on host listings; sparkle avg rating when rated
 - `IncomingRequestCard` — host incoming request card (cream / green / red status)
 - `MyBookingRequestCard` — borrower request card (find accent)
+- `RatingPanel` — post-visit star rating (booking detail)
+- `StarRating` — SparkleIcon star row for ratings and listing score display
 - `CategoryChips` — category selector (`variant="find"` | `"host"`)
 
 **Navigation helpers:**

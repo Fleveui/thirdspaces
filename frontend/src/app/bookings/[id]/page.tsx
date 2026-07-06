@@ -11,6 +11,7 @@ import { useAuth } from '@/lib/auth'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
 import { AppShell } from '@/components/AppShell'
 import { PageHeader } from '@/components/PageHeader'
+import { RatingPanel } from '@/components/RatingPanel'
 import {
   OwnerBooking,
   formatDate,
@@ -64,7 +65,6 @@ function BookingDetailContent() {
   const [actionError, setActionError] = useState<string | null>(null)
   const [rating, setRating] = useState(5)
   const [ratingComment, setRatingComment] = useState('')
-  const [ratingMessage, setRatingMessage] = useState<string | null>(null)
 
   const fetchBooking = async () => {
     const token = localStorage.getItem('auth_token')
@@ -81,6 +81,12 @@ function BookingDetailContent() {
     }
     setBooking(await response.json())
   }
+
+  useEffect(() => {
+    if (booking?.user_rating) {
+      setRating(booking.user_rating)
+    }
+  }, [booking?.user_rating])
 
   useEffect(() => {
     const load = async () => {
@@ -140,7 +146,7 @@ function BookingDetailContent() {
         const data = await response.json().catch(() => ({}))
         throw new Error(data.detail || 'Failed to submit rating')
       }
-      setRatingMessage('Thank you for your rating!')
+      await fetchBooking()
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'Unknown error')
     } finally {
@@ -152,6 +158,12 @@ function BookingDetailContent() {
     isOwner ? Boolean(booking?.owner_signed_at) : Boolean(booking?.borrower_signed_at)
   const otherSigned =
     isOwner ? Boolean(booking?.borrower_signed_at) : Boolean(booking?.owner_signed_at)
+
+  const ratingTitle = isOwner
+    ? `How was your experience with ${booking?.borrower_name ?? 'this guest'}?`
+    : `How was your visit at ${booking?.space_name ?? 'this space'}?`
+  const showRatingPanel = Boolean(booking && canRateBooking(booking))
+  const ratingSubmitted = Boolean(booking?.user_has_rated)
 
   return (
     <AppShell mode={isOwner ? 'host' : 'find'} variant="minimal">
@@ -297,44 +309,19 @@ function BookingDetailContent() {
               </Link>
             )}
 
-            {canRateBooking(
-              booking.status,
-              booking.end_date,
-              booking.borrower_signed_at,
-              booking.owner_signed_at
-            ) && !ratingMessage && (
-              <div className={panelClass()}>
-                <h2 className="font-semibold text-dark mb-3">Rate after visit</h2>
-                <select
-                  value={rating}
-                  onChange={(e) => setRating(Number(e.target.value))}
-                  className={`${theme.inputClass} mb-3 w-full`}
-                >
-                  {[5, 4, 3, 2, 1].map((n) => (
-                    <option key={n} value={n}>{n} stars</option>
-                  ))}
-                </select>
-                <textarea
-                  placeholder="Optional comment"
-                  value={ratingComment}
-                  onChange={(e) => setRatingComment(e.target.value)}
-                  className={`${theme.inputClass} resize-y mb-3 w-full`}
-                  rows={2}
-                />
-                <button
-                  type="button"
-                  onClick={handleRate}
-                  disabled={submitting}
-                  className={`${theme.primaryBtn} disabled:opacity-50`}
-                >
-                  Submit rating
-                </button>
-              </div>
-            )}
-            {ratingMessage && (
-              <p className={`text-sm text-center ${isOwner ? 'text-host-cream-accent' : 'text-primary'}`}>
-                {ratingMessage}
-              </p>
+            {showRatingPanel && (
+              <RatingPanel
+                title={ratingTitle}
+                accent={accent}
+                rating={rating}
+                onRatingChange={setRating}
+                comment={ratingComment}
+                onCommentChange={setRatingComment}
+                onSubmit={handleRate}
+                submitting={submitting}
+                submitted={ratingSubmitted}
+                submittedRating={booking.user_rating ?? rating}
+              />
             )}
 
             {actionError && <p className="text-red-600 text-sm text-center">{actionError}</p>}

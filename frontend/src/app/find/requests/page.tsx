@@ -11,7 +11,7 @@ import { ProtectedRoute } from '@/components/ProtectedRoute'
 import { AppShell } from '@/components/AppShell'
 import { PageHeader } from '@/components/PageHeader'
 import { MyBookingRequestCard } from '@/components/MyBookingRequestCard'
-import { BorrowerBooking } from '@/lib/bookings'
+import { BorrowerBooking, isVisitPast } from '@/lib/bookings'
 
 function FindRequestsContent() {
   const router = useRouter()
@@ -44,6 +44,22 @@ function FindRequestsContent() {
     if (token) fetchBookings()
   }, [token, fetchBookings])
 
+  const pending = bookings.filter((b) => b.status === 'pending')
+  const rejected = bookings.filter((b) => b.status === 'rejected')
+  const approved = bookings.filter((b) => b.status === 'approved')
+  const upcoming = approved.filter((b) => !isVisitPast(b.end_date))
+  const past = approved.filter((b) => isVisitPast(b.end_date))
+
+  const renderList = (items: BorrowerBooking[]) => (
+    <ul className="space-y-3">
+      {items.map((booking) => (
+        <li key={booking.booking_id}>
+          <MyBookingRequestCard booking={booking} />
+        </li>
+      ))}
+    </ul>
+  )
+
   return (
     <AppShell mode="find" variant="minimal">
       <div className="max-w-xl mx-auto">
@@ -63,13 +79,32 @@ function FindRequestsContent() {
               </Link>
             </p>
           ) : (
-            <ul className="space-y-3">
-              {bookings.map((booking) => (
-                <li key={booking.booking_id}>
-                  <MyBookingRequestCard booking={booking} />
-                </li>
-              ))}
-            </ul>
+            <div className="space-y-5">
+              {pending.length > 0 && (
+                <div>
+                  <h3 className="text-xs font-semibold text-white/80 uppercase tracking-wide mb-2">Pending</h3>
+                  {renderList(pending)}
+                </div>
+              )}
+              {upcoming.length > 0 && (
+                <div>
+                  <h3 className="text-xs font-semibold text-white/80 uppercase tracking-wide mb-2">Upcoming</h3>
+                  {renderList(upcoming)}
+                </div>
+              )}
+              {past.length > 0 && (
+                <div>
+                  <h3 className="text-xs font-semibold text-white/80 uppercase tracking-wide mb-2">Past visits</h3>
+                  {renderList(past)}
+                </div>
+              )}
+              {rejected.length > 0 && (
+                <div>
+                  <h3 className="text-xs font-semibold text-white/80 uppercase tracking-wide mb-2">Rejected</h3>
+                  {renderList(rejected)}
+                </div>
+              )}
+            </div>
           )}
         </section>
       </div>

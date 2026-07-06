@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { OwnerBooking, formatDateRange, exchangeOfferPreview } from '@/lib/bookings'
+import { OwnerBooking, formatDateRange, exchangeOfferPreview, needsRating } from '@/lib/bookings'
 import { accentClasses } from '@/lib/theme'
 
 function initials(name: string): string {
@@ -73,6 +73,11 @@ export function IncomingRequestCard({
             </p>
             {preview && (
               <p className="text-sm text-gray-500 mt-2 line-clamp-2">{preview}</p>
+            )}
+            {needsRating(booking) && (
+              <span className="inline-block mt-2 text-xs font-medium px-2.5 py-1 rounded-full bg-amber-50 text-amber-700">
+                Rate your visit
+              </span>
             )}
           </div>
         </div>

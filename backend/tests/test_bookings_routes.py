@@ -310,3 +310,124 @@ class TestCreateBooking:
 
         assert response.status_code == 201
         assert response.json()["status"] == "pending"
+
+
+class TestRateBooking:
+    def _seed_past_approved(
+        self,
+        db,
+        owner_id,
+        borrower_id="borrower-1",
+        booking_id="booking-rate-1",
+        end_offset_days=-1,
+    ):
+        space = Space(
+            id="space-rate-1",
+            name="Rate Loft",
+            owner_id=owner_id,
+            area_m2=90.0,
+            category="Loft",
+            location="Bolzano",
+        )
+        borrower = db.query(PersonalAccount).filter(PersonalAccount.id == borrower_id).first()
+        if not borrower:
+            borrower = PersonalAccount(
+                id=borrower_id,
+                name="Alice",
+                surname="Green",
+                email="alice@example.com",
+            )
+            db.add(borrower)
+        booking = Booking(
+            booking_id=booking_id,
+            space_id="space-rate-1",
+            borrower_id=borrower_id,
+            start_date=datetime.utcnow() - timedelta(days=10),
+            end_date=datetime.utcnow() + timedelta(days=end_offset_days),
+            status="approved",
+            exchange_offer="Promotion help",
+            created_at=datetime.utcnow(),
+        )
+        db.add(space)
+        db.add(booking)
+        db.commit()
+
+    def test_booking_includes_rating_fields(self, client, space_owner_token, db):
+        owner_id = client.get(
+            "/api/auth/me",
+            headers=auth_headers(space_owner_token),
+        ).json()["id"]
+        self._seed_past_approved(db, owner_id)
+
+        response = client.get(
+            "/api/bookings/booking-rate-1",
+            headers=auth_headers(space_owner_token),
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["rating_eligible"] is True
+        assert data["user_has_rated"] is False
+        assert data["user_rating"] is None
+
+    def test_rate_succeeds_after_visit_without_signatures(self, client, space_owner_token, db):
+        owner_id = client.get(
+            "/api/auth/me",
+            headers=auth_headers(space_owner_token),
+        ).json()["id"]
+        self._seed_past_approved(db, owner_id)
+
+        response = client.post(
+            "/api/bookings/booking-rate-1/rate",
+            json={"rating": 4, "comment": "Great guest"},
+            headers=auth_headers(space_owner_token),
+        )
+
+        assert response.status_code == 200
+        assert response.json()["rating"] == 4
+
+        detail = client.get(
+            "/api/bookings/booking-rate-1",
+            headers=auth_headers(space_owner_token),
+        ).json()
+        assert detail["user_has_rated"] is True
+        assert detail["user_rating"] == 4
+
+    def test_rate_blocked_before_visit_ends(self, client, space_owner_token, db):
+        owner_id = client.get(
+            "/api/auth/me",
+            headers=auth_headers(space_owner_token),
+        ).json()["id"]
+        self._seed_past_approved(db, owner_id, end_offset_days=3)
+
+        response = client.post(
+            "/api/bookings/booking-rate-1/rate",
+            json={"rating": 5},
+            headers=auth_headers(space_owner_token),
+        )
+
+        assert response.status_code == 400
+        assert "visit has ended" in response.json()["detail"]
+
+    def test_duplicate_rate_rejected(self, client, space_owner_token, db):
+        owner_id = client.get(
+            "/api/auth/me",
+            headers=auth_headers(space_owner_token),
+        ).json()["id"]
+        self._seed_past_approved(db, owner_id)
+
+        headers = auth_headers(space_owner_token)
+        first = client.post(
+            "/api/bookings/booking-rate-1/rate",
+            json={"rating": 5},
+            headers=headers,
+        )
+        assert first.status_code == 200
+
+        second = client.post(
+            "/api/bookings/booking-rate-1/rate",
+            json={"rating": 3},
+            headers=headers,
+        )
+        assert second.status_code == 400
+        assert second.json()["detail"] == "You have already rated this booking"

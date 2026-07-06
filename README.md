@@ -63,11 +63,11 @@ chmod +x start.sh stop.sh  # Make scripts executable (first time only)
 2. **Register:** Click **join us!**, fill in the form, select account type
 3. **Log in:** Use your credentials (or seed user `demoowner` / `secret12` after running `python3 seed_data.py` in `backend/`)
 4. **Home hub:** After login you land on `/dashboard` — header shows your username with the app logo as a profile badge; **Find a space**, **My booking requests**, **Saved favorites**, **List your space**, and **Incoming requests** strips; messages and notification icons in the header
-5. **Find mode (`/find`):** Intro → **Browse all spaces** for results. Purple theme. Own listings hidden from search. **My booking requests** at `/find/requests`
+5. **Find mode (`/find`):** Intro → **Browse all spaces** for results. Purple theme. Own listings hidden from search. Listings show average visit rating (SparkleIcon). **My booking requests** at `/find/requests`
 6. **Host mode (`/host`):** Intro → **View my listings** (`/host?view=listings`). Cream theme. Listing rows show booking request badges (not "Available now"). **Incoming requests** at `/host/requests`
 7. **Own listing detail:** From My spaces → open a listing. Shows all list-a-space fields, photo placeholder, request strip above photo. Back → listings view
 8. **List a space (`/spaces/new`):** Cream chip-based form with exchange preferences
-9. **Book → approve → chat:** Book from a space detail page; owner approves on `/host/requests`; chat opens at `/messages`. Both parties sign the contract on booking detail before ratings.
+9. **Book → approve → chat:** Book from a space detail page; owner approves on `/host/requests`; chat opens at `/messages`. After the visit ends, both parties can leave a star rating on the booking detail page.
 
 **Navigation tips (host):**
 - Dashboard → Incoming requests → back goes to **dashboard**

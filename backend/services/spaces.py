@@ -4,8 +4,25 @@
 from typing import List, Optional, Tuple
 import uuid
 from sqlalchemy.orm import Session
-from sqlalchemy import or_
-from models import Space, SpacePhoto
+from models import Booking, Rating, Space, SpacePhoto
+
+
+def _space_rating_stats(space_id: str, db: Session) -> Tuple[Optional[float], int]:
+    """Average borrower visit rating for a space (borrowers rate the stay)."""
+    rows = (
+        db.query(Rating.rating)
+        .join(Booking, Rating.booking_id == Booking.booking_id)
+        .filter(
+            Booking.space_id == space_id,
+            Rating.rater_user_id == Booking.borrower_id,
+        )
+        .all()
+    )
+    if not rows:
+        return None, 0
+    values = [row[0] for row in rows]
+    avg = round(sum(values) / len(values), 1)
+    return avg, len(values)
 
 
 def _first_photo_url(space_id: str, db: Session) -> Optional[str]:
@@ -19,6 +36,7 @@ def _first_photo_url(space_id: str, db: Session) -> Optional[str]:
 
 
 def space_to_dict(space: Space, db: Session, include_photos: bool = False) -> dict:
+    avg_rating, rating_count = _space_rating_stats(space.id, db)
     data = {
         "id": space.id,
         "name": space.name,
@@ -33,6 +51,8 @@ def space_to_dict(space: Space, db: Session, include_photos: bool = False) -> di
         "exchange_preferences": space.exchange_preferences,
         "max_people": space.max_people,
         "image_url": _first_photo_url(space.id, db),
+        "avg_rating": avg_rating,
+        "rating_count": rating_count,
     }
     if include_photos:
         photos = (

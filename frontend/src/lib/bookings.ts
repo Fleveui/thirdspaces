@@ -16,6 +16,9 @@ export interface OwnerBooking {
   created_at: string
   role?: string
   owner_id?: string
+  rating_eligible?: boolean
+  user_has_rated?: boolean
+  user_rating?: number | null
 }
 
 export type BorrowerBooking = OwnerBooking
@@ -78,14 +81,24 @@ export function bookingChatEligible(booking: { status: string }): boolean {
   return booking.status === 'approved'
 }
 
-export function canRateBooking(
-  status: string,
-  endDate: string | null,
-  borrowerSigned: string | null | undefined,
-  ownerSigned: string | null | undefined
-): boolean {
-  if (status !== 'approved') return false
-  if (!contractFullySigned(borrowerSigned, ownerSigned)) return false
-  if (!endDate) return true
-  return new Date(endDate) <= new Date()
+export function isVisitPast(endDate: string | null): boolean {
+  if (!endDate) return false
+  const end = new Date(endDate)
+  end.setHours(23, 59, 59, 999)
+  return end <= new Date()
+}
+
+export function canRateBooking(booking: {
+  status: string
+  end_date?: string | null
+  rating_eligible?: boolean
+}): boolean {
+  if (booking.rating_eligible !== undefined) return booking.rating_eligible
+  if (booking.status !== 'approved') return false
+  if (!booking.end_date) return true
+  return isVisitPast(booking.end_date)
+}
+
+export function needsRating(booking: OwnerBooking): boolean {
+  return Boolean(canRateBooking(booking) && !booking.user_has_rated)
 }

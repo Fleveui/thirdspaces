@@ -42,6 +42,9 @@ class BookingResponse(BaseModel):
     created_at: datetime
     role: Optional[str] = None
     owner_id: Optional[str] = None
+    rating_eligible: bool = False
+    user_has_rated: bool = False
+    user_rating: Optional[int] = None
 
 
 class CreateBookingRequest(BaseModel):

@@ -10,7 +10,7 @@ import { ProtectedRoute } from '@/components/ProtectedRoute'
 import { AppShell } from '@/components/AppShell'
 import { PageHeader } from '@/components/PageHeader'
 import { IncomingRequestCard } from '@/components/IncomingRequestCard'
-import { OwnerBooking } from '@/lib/bookings'
+import { OwnerBooking, isVisitPast } from '@/lib/bookings'
 import { hostRequestsBackHref } from '@/lib/hostNavigation'
 
 function HostRequestsContent() {
@@ -67,6 +67,8 @@ function HostRequestsContent() {
 
   const pending = ownerBookings.filter((b) => b.status === 'pending')
   const confirmed = ownerBookings.filter((b) => b.status === 'approved')
+  const confirmedUpcoming = confirmed.filter((b) => !isVisitPast(b.end_date))
+  const confirmedPast = confirmed.filter((b) => isVisitPast(b.end_date))
   const rejected = ownerBookings.filter((b) => b.status === 'rejected')
 
   return (
@@ -107,13 +109,26 @@ function HostRequestsContent() {
               </section>
             )}
 
-            {confirmed.length > 0 && (
+            {confirmedUpcoming.length > 0 && (
               <section>
                 <h3 className="text-sm font-semibold text-green-700 uppercase tracking-wide mb-3">
-                  Confirmed
+                  Upcoming
                 </h3>
                 <div className="space-y-3">
-                  {confirmed.map((booking) => (
+                  {confirmedUpcoming.map((booking) => (
+                    <IncomingRequestCard key={booking.booking_id} booking={booking} />
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {confirmedPast.length > 0 && (
+              <section>
+                <h3 className="text-sm font-semibold text-green-700 uppercase tracking-wide mb-3">
+                  Past visits
+                </h3>
+                <div className="space-y-3">
+                  {confirmedPast.map((booking) => (
                     <IncomingRequestCard key={booking.booking_id} booking={booking} />
                   ))}
                 </div>

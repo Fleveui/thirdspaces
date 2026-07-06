@@ -30,11 +30,48 @@ def _generate_contract_text(space: Space, booking: Booking) -> str:
     )
 
 
+def _is_rating_eligible(booking: Booking) -> bool:
+    if booking.status != "approved":
+        return False
+    if not booking.end_date:
+        return True
+    return booking.end_date <= datetime.utcnow()
+
+
+def _rating_fields_for_user(
+    booking: Booking,
+    viewer_user_id: Optional[str],
+    db: Optional[Session],
+) -> dict:
+    eligible = _is_rating_eligible(booking)
+    user_has_rated = False
+    user_rating = None
+    if viewer_user_id and db:
+        existing = (
+            db.query(Rating)
+            .filter(
+                Rating.booking_id == booking.booking_id,
+                Rating.rater_user_id == viewer_user_id,
+            )
+            .first()
+        )
+        if existing:
+            user_has_rated = True
+            user_rating = existing.rating
+    return {
+        "rating_eligible": eligible,
+        "user_has_rated": user_has_rated,
+        "user_rating": user_rating,
+    }
+
+
 def _booking_row_to_dict(
     booking: Booking,
     space: Space,
     borrower: Optional[PersonalAccount],
     role: str = "owner",
+    viewer_user_id: Optional[str] = None,
+    db: Optional[Session] = None,
 ) -> dict:
     data = {
         "booking_id": booking.booking_id,
@@ -55,6 +92,7 @@ def _booking_row_to_dict(
         "role": role,
         "owner_id": space.owner_id,
     }
+    data.update(_rating_fields_for_user(booking, viewer_user_id, db))
     return data
 
 
@@ -73,7 +111,10 @@ def list_bookings_for_owner(owner_id: str, db: Session) -> List[dict]:
         .order_by(Booking.created_at.desc())
         .all()
     )
-    return [_booking_row_to_dict(booking, space, borrower, "owner") for booking, space, borrower in rows]
+    return [
+        _booking_row_to_dict(booking, space, borrower, "owner", owner_id, db)
+        for booking, space, borrower in rows
+    ]
 
 
 def list_bookings_for_borrower(borrower_id: str, db: Session) -> List[dict]:
@@ -85,7 +126,10 @@ def list_bookings_for_borrower(borrower_id: str, db: Session) -> List[dict]:
         .order_by(Booking.created_at.desc())
         .all()
     )
-    return [_booking_row_to_dict(booking, space, borrower, "borrower") for booking, space, borrower in rows]
+    return [
+        _booking_row_to_dict(booking, space, borrower, "borrower", borrower_id, db)
+        for booking, space, borrower in rows
+    ]
 
 
 def _ensure_approved_contract(booking: Booking, space: Space, db: Session) -> None:
@@ -105,7 +149,7 @@ def get_booking_for_owner(booking_id: str, owner_id: str, db: Session) -> Option
         return None
     booking, space, borrower = row
     _ensure_approved_contract(booking, space, db)
-    return _booking_row_to_dict(booking, space, borrower, "owner")
+    return _booking_row_to_dict(booking, space, borrower, "owner", owner_id, db)
 
 
 def get_booking_for_borrower(booking_id: str, borrower_id: str, db: Session) -> Optional[dict]:
@@ -120,7 +164,7 @@ def get_booking_for_borrower(booking_id: str, borrower_id: str, db: Session) -> 
         return None
     booking, space, borrower = row
     _ensure_approved_contract(booking, space, db)
-    return _booking_row_to_dict(booking, space, borrower, "borrower")
+    return _booking_row_to_dict(booking, space, borrower, "borrower", borrower_id, db)
 
 
 def get_booking_for_user(booking_id: str, user_id: str, db: Session) -> Optional[dict]:
@@ -170,7 +214,7 @@ def create_booking(
         db.add(booking)
         db.commit()
         db.refresh(booking)
-        return _booking_row_to_dict(booking, space, borrower, "borrower"), None
+        return _booking_row_to_dict(booking, space, borrower, "borrower", user.id, db), None
     except Exception as e:
         db.rollback()
         return None, f"Database error: {str(e)}"
@@ -275,9 +319,6 @@ def rate_booking(
 
     if booking.status != "approved":
         return None, "Only approved bookings can be rated"
-
-    if not booking.borrower_signed_at or not booking.owner_signed_at:
-        return None, "Both parties must sign the contract before rating"
 
     if booking.end_date and booking.end_date > datetime.utcnow():
         return None, "You can rate after the visit has ended"
