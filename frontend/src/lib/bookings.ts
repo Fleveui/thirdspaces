@@ -30,6 +30,14 @@ export function countBookingsBySpace(bookings: OwnerBooking[]): Record<string, n
   }, {})
 }
 
+export function countPendingBookingsBySpace(bookings: OwnerBooking[]): Record<string, number> {
+  return bookings.reduce<Record<string, number>>((acc, booking) => {
+    if (booking.status !== 'pending') return acc
+    acc[booking.space_id] = (acc[booking.space_id] ?? 0) + 1
+    return acc
+  }, {})
+}
+
 export function statusLabel(status: string): string {
   switch (status) {
     case 'pending':

@@ -40,7 +40,7 @@ function ListSpaceContent() {
   const host = accentClasses('host')
 
   const [formData, setFormData] = useState<FormData>(initialFormData)
-  const [exchangeSelected, setExchangeSelected] = useState<string[]>([])
+  const [exchangePreferences, setExchangePreferences] = useState('')
   const [photos, setPhotos] = useState<FileList | null>(null)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -75,10 +75,17 @@ function ListSpaceContent() {
     if (submitError) setSubmitError(null)
   }
 
-  const toggleExchange = (option: string) => {
-    setExchangeSelected((prev) =>
-      prev.includes(option) ? prev.filter((o) => o !== option) : [...prev, option]
-    )
+  const appendExchangeSuggestion = (option: string) => {
+    setExchangePreferences((prev) => {
+      const trimmed = prev.trim()
+      const parts = trimmed
+        ? trimmed.split(';').map((part) => part.trim()).filter(Boolean)
+        : []
+      if (parts.includes(option)) return prev
+      if (!trimmed) return option
+      return `${trimmed}; ${option}`
+    })
+    if (submitError) setSubmitError(null)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -106,8 +113,8 @@ function ListSpaceContent() {
 
     if (formData.availability.trim()) body.availability = formData.availability.trim()
     if (formData.description.trim()) body.description = formData.description.trim()
-    if (exchangeSelected.length > 0) {
-      body.exchange_preferences = exchangeSelected.join('; ')
+    if (exchangePreferences.trim()) {
+      body.exchange_preferences = exchangePreferences.trim()
     }
     if (formData.max_people.trim()) {
       const mp = parseInt(formData.max_people, 10)
@@ -268,29 +275,43 @@ function ListSpaceContent() {
           </div>
 
           <div>
-            <p className="text-sm font-semibold text-dark mb-3">Exchange preferences (optional)</p>
-            <div className="space-y-2">
-              {EXCHANGE_OPTIONS.map((option) => (
-                <button
-                  key={option}
-                  type="button"
-                  onClick={() => toggleExchange(option)}
-                  className={`w-full flex items-center gap-3 p-3 rounded-2xl border text-left text-sm ${
-                    exchangeSelected.includes(option) ? host.selectedBorder : 'border-gray-200'
-                  }`}
-                >
-                  <span
-                    className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
-                      exchangeSelected.includes(option) ? host.radioBorder : 'border-gray-300'
+            <p className="text-sm font-semibold text-dark mb-3">Exchange preferences</p>
+            <textarea
+              rows={3}
+              placeholder="What would you like in exchange for use of your space? e.g. help with setup, social media promotion..."
+              value={exchangePreferences}
+              onChange={(e) => {
+                setExchangePreferences(e.target.value)
+                if (submitError) setSubmitError(null)
+              }}
+              className="input-cream resize-y"
+              disabled={submitting}
+            />
+            <p className="text-xs text-gray-400 mt-1.5 ml-1">
+              Separate multiple items with semicolons, or tap a suggestion below.
+            </p>
+            <div className="flex flex-wrap gap-2 mt-3">
+              {EXCHANGE_OPTIONS.map((option) => {
+                const included = exchangePreferences
+                  .split(';')
+                  .map((part) => part.trim())
+                  .includes(option)
+                return (
+                  <button
+                    key={option}
+                    type="button"
+                    onClick={() => appendExchangeSuggestion(option)}
+                    disabled={submitting || included}
+                    className={`text-xs font-medium px-3 py-1.5 rounded-full border transition-colors ${
+                      included
+                        ? `${host.chipActive} opacity-60 cursor-default`
+                        : 'border-gray-200 text-gray-600 hover:border-host-cream/40'
                     }`}
                   >
-                    {exchangeSelected.includes(option) && (
-                      <span className={`w-2.5 h-2.5 rounded-full ${host.radioDot}`} />
-                    )}
-                  </span>
-                  {option}
-                </button>
-              ))}
+                    {option}
+                  </button>
+                )
+              })}
             </div>
           </div>
 

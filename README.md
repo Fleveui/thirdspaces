@@ -79,7 +79,7 @@ chmod +x start.sh stop.sh  # Make scripts executable (first time only)
 cd backend
 python3 seed_data.py
 ```
-Then log in as `demoowner` / `secret12`. **Find** shows 6 spaces (owner2, all Bolzano). **My spaces** shows 3 spaces (demoowner only). No overlap between the two modes.
+Then log in as `demoowner` / `secret12`. **Find** shows 8 Bolzano spaces with photos. **My spaces** shows 3 demoowner listings with incoming request badges.
 
 ### 5. Stop the system
 

@@ -13,7 +13,7 @@ import { PageHeader } from '@/components/PageHeader'
 import { SpaceCard } from '@/components/SpaceCard'
 import { SparkleIcon } from '@/components/SparkleIcon'
 import { SpaceListing } from '@/lib/spaces'
-import { countBookingsBySpace, OwnerBooking } from '@/lib/bookings'
+import { countPendingBookingsBySpace, OwnerBooking } from '@/lib/bookings'
 import { useAuth, SessionExpiredError } from '@/lib/auth'
 
 type HostView = 'intro' | 'listings'
@@ -51,7 +51,7 @@ function HostContent() {
 
       if (bookingsRes.ok) {
         const bookings: OwnerBooking[] = await bookingsRes.json()
-        setRequestCountBySpace(countBookingsBySpace(bookings))
+        setRequestCountBySpace(countPendingBookingsBySpace(bookings))
       } else {
         setRequestCountBySpace({})
       }

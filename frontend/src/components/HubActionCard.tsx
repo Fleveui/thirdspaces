@@ -58,13 +58,14 @@ export function HubActionCard({ variant, href }: HubActionCardProps) {
 interface IncomingRequestsStripProps {
   href: string
   count: number
+  className?: string
 }
 
-export function IncomingRequestsStrip({ href, count }: IncomingRequestsStripProps) {
+export function IncomingRequestsStrip({ href, count, className = '' }: IncomingRequestsStripProps) {
   return (
     <Link
       href={href}
-      className="flex items-center gap-3 w-full rounded-3xl px-5 py-4 bg-host-cream-light/50 hover:bg-host-cream-light/60 transition-colors"
+      className={`flex items-center gap-3 w-full rounded-3xl px-5 py-4 bg-host-cream-light/50 hover:bg-host-cream-light/60 transition-colors ${className}`}
     >
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-host-cream-accent shrink-0">
         <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />

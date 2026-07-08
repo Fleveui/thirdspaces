@@ -10,6 +10,7 @@ import { ProtectedRoute } from '@/components/ProtectedRoute'
 import { AppShell } from '@/components/AppShell'
 import { PageHeader } from '@/components/PageHeader'
 import { IncomingRequestCard } from '@/components/IncomingRequestCard'
+import { MatchCelebration } from '@/components/MatchCelebration'
 import { OwnerBooking, isVisitPast } from '@/lib/bookings'
 import { hostRequestsBackHref } from '@/lib/hostNavigation'
 
@@ -23,6 +24,7 @@ function HostRequestsContent() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [actionBookingId, setActionBookingId] = useState<string | null>(null)
+  const [showMatchCelebration, setShowMatchCelebration] = useState(false)
 
   const fetchOwnerBookings = useCallback(async () => {
     try {
@@ -57,6 +59,9 @@ function HostRequestsContent() {
         const data = await response.json().catch(() => ({}))
         throw new Error(data.detail || `Failed to ${action} booking`)
       }
+      if (action === 'approve') {
+        setShowMatchCelebration(true)
+      }
       await fetchOwnerBookings()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error')
@@ -65,11 +70,17 @@ function HostRequestsContent() {
     }
   }
 
-  const pending = ownerBookings.filter((b) => b.status === 'pending')
-  const confirmed = ownerBookings.filter((b) => b.status === 'approved')
+  const spaceId = searchParams.get('space_id')
+  const visibleBookings = spaceId
+    ? ownerBookings.filter((b) => b.space_id === spaceId)
+    : ownerBookings
+  const filteredSpaceName = spaceId ? visibleBookings[0]?.space_name : null
+
+  const pending = visibleBookings.filter((b) => b.status === 'pending')
+  const confirmed = visibleBookings.filter((b) => b.status === 'approved')
   const confirmedUpcoming = confirmed.filter((b) => !isVisitPast(b.end_date))
   const confirmedPast = confirmed.filter((b) => isVisitPast(b.end_date))
-  const rejected = ownerBookings.filter((b) => b.status === 'rejected')
+  const rejected = visibleBookings.filter((b) => b.status === 'rejected')
 
   return (
     <AppShell mode="host" variant="minimal">
@@ -80,15 +91,19 @@ function HostRequestsContent() {
         />
 
         <p className="text-host-cream-accent/80 text-sm text-center mb-8">
-          Artists interested in your space will appear here.
+          {filteredSpaceName
+            ? `Requests for ${filteredSpaceName}`
+            : 'Artists interested in your space will appear here.'}
         </p>
 
         {loading ? (
           <p className="text-gray-600 text-sm text-center py-8">Loading requests...</p>
         ) : error ? (
           <p className="text-red-600 text-sm text-center py-8">{error}</p>
-        ) : ownerBookings.length === 0 ? (
-          <p className="text-gray-600 text-sm text-center py-8">No booking requests yet.</p>
+        ) : visibleBookings.length === 0 ? (
+          <p className="text-gray-600 text-sm text-center py-8">
+            {spaceId ? 'No booking requests for this space yet.' : 'No booking requests yet.'}
+          </p>
         ) : (
           <div className="space-y-6">
             {pending.length > 0 && (
@@ -150,6 +165,10 @@ function HostRequestsContent() {
           </div>
         )}
       </div>
+      <MatchCelebration
+        open={showMatchCelebration}
+        onClose={() => setShowMatchCelebration(false)}
+      />
     </AppShell>
   )
 }

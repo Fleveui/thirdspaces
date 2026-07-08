@@ -2,12 +2,67 @@
 # Seed Database with Demo Data
 # Usage: python3 seed_data.py
 
+import shutil
+import uuid
 from datetime import datetime, timedelta
+from pathlib import Path
+
 from database import SessionLocal
-from models import Space, Booking, PersonalAccount, User, AccountType, Rating
+from models import Space, Booking, PersonalAccount, User, AccountType, Rating, SpacePhoto
 from services.auth import hash_password
 from services.bookings import _generate_contract_text
-import uuid
+
+SEED_DIR = Path(__file__).resolve().parent
+SEED_ASSETS_DIR = SEED_DIR / "seed_assets" / "spaces"
+UPLOAD_DIR = SEED_DIR / "uploads"
+
+SPACE_PHOTO_MAP = {
+    "Bright Loft - Centro": "alpine-loft.png",
+    "Panoramic Terrace - Walther": "walther-terrace.png",
+    "Meeting Room - Portici": "conference-room.png",
+    "Alpine Loft - Centro": "alpine-loft.png",
+    "Walther Terrace": "walther-terrace.png",
+    "Makers Studio - Oltrisarco": "makers-studio.png",
+    "Community Garden - Europa": "community-garden.png",
+    "Creative Studio - Gries": "creative-studio.png",
+    "Shared Garden - Don Bosco": "shared-garden.png",
+    "Meeting Room - Central": "conference-room.png",
+    "Community Kitchen - Centro": "culinary-experience.png",
+}
+
+
+def _photo_asset_for_space(space: Space) -> str | None:
+    return SPACE_PHOTO_MAP.get(space.name)
+
+
+def _attach_seed_photo(space: Space, db) -> None:
+    asset_name = _photo_asset_for_space(space)
+    if not asset_name:
+        return
+    asset_path = SEED_ASSETS_DIR / asset_name
+    if not asset_path.is_file():
+        return
+
+    UPLOAD_DIR.mkdir(exist_ok=True)
+    filename = f"{uuid.uuid4().hex}{asset_path.suffix}"
+    shutil.copy2(asset_path, UPLOAD_DIR / filename)
+
+    db.add(SpacePhoto(
+        photo_id=uuid.uuid4().hex,
+        space_id=space.id,
+        image_url=f"/uploads/{filename}",
+        position=0,
+        created_at=datetime.utcnow(),
+    ))
+
+
+def _clear_uploads() -> None:
+    if not UPLOAD_DIR.exists():
+        return
+    for path in UPLOAD_DIR.iterdir():
+        if path.is_file():
+            path.unlink()
+
 
 def seed_database():
     """Populate database with demo data"""
@@ -17,9 +72,11 @@ def seed_database():
         # Clear existing data
         db.query(Rating).delete()
         db.query(Booking).delete()
+        db.query(SpacePhoto).delete()
         db.query(Space).delete()
         db.query(PersonalAccount).delete()
         db.commit()
+        _clear_uploads()
         print("✅ Cleared existing data")
         
         # Create demo space owner profiles
@@ -62,8 +119,8 @@ def seed_database():
         db.commit()
         print("✅ Created demo space owner login (demoowner / secret12)")
         
-        # owner1 (demoowner): 3 spaces — visible only in My spaces
-        # owner2: 6 spaces — visible only in Find for demoowner
+        # owner1 (demoowner): 3 spaces — My spaces / Host
+        # owner2: 8 Bolzano spaces — visible in Find for demoowner
         spaces_data = [
             {
                 "name": "Bright Loft - Centro",
@@ -75,7 +132,8 @@ def seed_database():
                 "max_people": 35,
                 "location": "Via Laurin, Bolzano",
                 "description": "Spacious open-plan loft in Bolzano city centre with mountain views. Ideal for workshops, exhibitions, and community gatherings.",
-                "rules": "No smoking. Respect checkout time. Final cleanup is the organizer's responsibility."
+                "rules": "No smoking. Respect checkout time. Final cleanup is the organizer's responsibility.",
+                "exchange_preferences": "Help with event setup or social media coverage."
             },
             {
                 "name": "Panoramic Terrace - Walther",
@@ -87,10 +145,11 @@ def seed_database():
                 "max_people": 25,
                 "location": "Piazza Walther, Bolzano",
                 "description": "Rooftop terrace with views of the Dolomites, perfect for outdoor events, drinks, and small performances.",
-                "rules": "Maximum 25 guests. Music until 10:00 PM. No fireworks."
+                "rules": "Maximum 25 guests. Music until 10:00 PM. No fireworks.",
+                "exchange_preferences": "Photography or catering help in exchange for weekend use."
             },
             {
-                "name": "Meeting Room - Central",
+                "name": "Meeting Room - Portici",
                 "owner_id": owner1_id,
                 "area_m2": 60.0,
                 "is_outdoor": False,
@@ -99,7 +158,7 @@ def seed_database():
                 "max_people": 15,
                 "location": "Via dei Portici, Bolzano",
                 "description": "Central meeting room with Wi-Fi, projector, and whiteboard. For meetings, training, and small professional events.",
-                "rules": "Free cancellation up to 24 hours before. Return the room in its original condition."
+                "rules": "Free cancellation up to 24 hours before. Return the room in its original condition.",
             },
             {
                 "name": "Alpine Loft - Centro",
@@ -177,6 +236,32 @@ def seed_database():
                 "description": "Urban garden with a community allotment, picnic area, and space for outdoor workshops.",
                 "rules": "Respect the allotment plants. Bring bags for waste. Pets on leash only."
             },
+            {
+                "name": "Meeting Room - Central",
+                "owner_id": owner2_id,
+                "area_m2": 60.0,
+                "is_outdoor": False,
+                "category": "Conference",
+                "availability": "Hourly",
+                "max_people": 15,
+                "location": "Via dei Portici, Bolzano",
+                "description": "Central meeting room with Wi-Fi, projector, and whiteboard. For meetings, training, and small professional events.",
+                "rules": "Free cancellation up to 24 hours before. Return the room in its original condition.",
+                "exchange_preferences": "Help with room setup or note-taking for longer bookings."
+            },
+            {
+                "name": "Community Kitchen - Centro",
+                "owner_id": owner2_id,
+                "area_m2": 80.0,
+                "is_outdoor": False,
+                "category": "Culinary experience",
+                "availability": "Weekdays 10-18",
+                "max_people": 20,
+                "location": "Via Laurin, Bolzano",
+                "description": "Shared commercial kitchen for cooking workshops, pop-up dining, and food skills sessions. Fully equipped with ovens, prep stations, and cold storage.",
+                "rules": "Follow food safety guidelines. Clean all surfaces after use. No deep frying without prior agreement.",
+                "exchange_preferences": "Teaching a cooking class or helping with kitchen cleanup."
+            },
         ]
         
         created_spaces = []
@@ -190,7 +275,12 @@ def seed_database():
             created_spaces.append(space)
         
         db.commit()
-        print(f"✅ Created {len(created_spaces)} spaces (3 demoowner, 6 other owner)")
+        print(f"✅ Created {len(created_spaces)} spaces (3 demoowner, 8 Find listings)")
+
+        for space in created_spaces:
+            _attach_seed_photo(space, db)
+        db.commit()
+        print(f"✅ Created photos for {len(created_spaces)} spaces")
         
         # Create demo personal accounts (borrowers)
         borrower = PersonalAccount(
@@ -222,34 +312,44 @@ def seed_database():
         db.add(borrower3)
         db.commit()
         print("✅ Created 3 personal accounts (borrowers)")
-        
-        # Create demo bookings on owner1 spaces with mixed statuses
-        owner1_spaces = [space for space in created_spaces if space.owner_id == owner1_id]
-        booking_statuses = ["pending", "approved", "rejected"]
-        exchange_offers = [
-            "I am a visual artist working with large-scale textile installations. I would love to use your loft for a two-week residency and open studio.",
-            "Professional photo coverage and social media promotion for your space in exchange for weekend access.",
-            "Weekly garden maintenance and composting support for three months.",
-        ]
 
+        # Demo bookings on demoowner spaces (2 pending + 1 approved)
+        owner1_spaces = [space for space in created_spaces if space.owner_id == owner1_id]
+        demoowner_booking_specs = [
+            (
+                borrower,
+                "pending",
+                "I am a visual artist working with large-scale textile installations. I would love to use your loft for a two-week residency and open studio.",
+            ),
+            (
+                borrower2,
+                "pending",
+                "Weekend acoustic sessions and a small listening event in exchange for helping refresh the terrace planters.",
+            ),
+            (
+                borrower3,
+                "approved",
+                "Professional photo coverage and social media promotion for your space in exchange for weekend access.",
+            ),
+        ]
         for i, space in enumerate(owner1_spaces[:3]):
+            guest, status, offer = demoowner_booking_specs[i]
             booking = Booking(
                 booking_id=str(uuid.uuid4().hex),
                 space_id=space.id,
-                borrower_id=borrower.id,
+                borrower_id=guest.id,
                 start_date=datetime.utcnow() + timedelta(days=7 + i * 7),
                 end_date=datetime.utcnow() + timedelta(days=14 + i * 7),
-                status=booking_statuses[i],
-                exchange_offer=exchange_offers[i],
+                status=status,
+                exchange_offer=offer,
                 intended_use="Creative residency and community workshop",
                 created_at=datetime.utcnow(),
             )
-            if booking_statuses[i] == "approved":
+            if status == "approved":
                 booking.contract_text = _generate_contract_text(space, booking)
             db.add(booking)
-
         db.commit()
-        print("✅ Created 3 demo bookings (pending, approved, rejected)")
+        print("✅ Created 3 demo bookings on demoowner listings (2 pending, 1 approved)")
 
         # Past approved bookings + borrower ratings on owner2 spaces (visible in Find)
         owner2_spaces = {s.name: s for s in created_spaces if s.owner_id == owner2_id}

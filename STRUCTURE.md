@@ -11,7 +11,7 @@ thirdspaces/
 │   ├── database.py                 — SQLite connection, schema migration on startup
 │   ├── dependencies.py             — shared auth: get_current_user, get_optional_user
 │   ├── import_excel.py             — script to import data from database edt.xlsx
-│   ├── seed_data.py                — demo seed (Milan + Bolzano spaces, bookings, demoowner)
+│   ├── seed_data.py                — demo seed (3 demoowner + 8 Find spaces, demoowner)
 │   ├── routes/
 │   │   ├── auth.py                 — API endpoints: /api/auth/* (register, login, me, logout)
 │   │   ├── spaces.py               — API endpoints: /api/spaces/* (create, search, mine, photos)
@@ -21,6 +21,7 @@ thirdspaces/
 │   │   ├── auth.py                 — business logic (password hashing, token generation)
 │   │   ├── spaces.py               — business logic (create_space, search_spaces, list_by_owner)
 │   │   └── bookings.py             — business logic (create, approve/reject, contracts, ratings)
+│   ├── seed_assets/spaces/         — bundled demo photos (copied to uploads/ on seed)
 │   ├── uploads/                    — uploaded space photos (served at /uploads/)
 │   ├── tests/
 │   │   ├── conftest.py             — pytest fixtures (in-memory DB, test client, auth tokens)
@@ -208,7 +209,8 @@ thirdspaces/
 **seed_data.py**
 - Standalone script to populate demo data in English
 - Clears and re-seeds business accounts, spaces, bookings (pending/approved/rejected)
-- Milan spaces on owner1; 4 Bolzano spaces on owner2 (Alpine Loft, Walther Terrace, Makers Studio, Community Garden)
+- Copies bundled PNG photos from `seed_assets/spaces/` into `uploads/` and links them via `SpacePhoto`
+- Seeds 3 demoowner listings (My spaces) + 8 Find listings (all 7 categories)
 - Creates demo login `demoowner` / `secret12` (User.id matches owner1)
 - Usage: `python3 seed_data.py`
 
@@ -392,7 +394,7 @@ Implemented in `frontend/src/lib/hostNavigation.ts` via `space_id` query paramet
 - Create listing, photo upload, `exchange_preferences`
 - Full booking lifecycle: request, approve/reject, contracts, ratings
 - Real-time chat (`/messages`, WebSocket)
-- Demo seed: Milan + Bolzano spaces, `demoowner` / `secret12`
+- Demo seed: 8 Bolzano spaces with bundled photos (all categories), `demoowner` / `secret12`
 - Backend tests (61+)
 
 **Next:**

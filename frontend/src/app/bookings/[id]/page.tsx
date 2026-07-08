@@ -12,6 +12,7 @@ import { ProtectedRoute } from '@/components/ProtectedRoute'
 import { AppShell } from '@/components/AppShell'
 import { PageHeader } from '@/components/PageHeader'
 import { RatingPanel } from '@/components/RatingPanel'
+import { MatchCelebration } from '@/components/MatchCelebration'
 import {
   OwnerBooking,
   formatDate,
@@ -65,6 +66,7 @@ function BookingDetailContent() {
   const [actionError, setActionError] = useState<string | null>(null)
   const [rating, setRating] = useState(5)
   const [ratingComment, setRatingComment] = useState('')
+  const [showMatchCelebration, setShowMatchCelebration] = useState(false)
 
   const fetchBooking = async () => {
     const token = localStorage.getItem('auth_token')
@@ -122,6 +124,9 @@ function BookingDetailContent() {
         throw new Error(data.detail || `Failed to ${action}`)
       }
       setBooking(await response.json())
+      if (action === 'approve') {
+        setShowMatchCelebration(true)
+      }
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'Unknown error')
     } finally {
@@ -349,6 +354,10 @@ function BookingDetailContent() {
           </div>
         ) : null}
       </div>
+      <MatchCelebration
+        open={showMatchCelebration}
+        onClose={() => setShowMatchCelebration(false)}
+      />
     </AppShell>
   )
 }
